@@ -1,0 +1,4 @@
+# Caddy configuration for automatic SSL on pagerzero.pro
+pagerzero.pro, www.pagerzero.pro {
+    reverse_proxy pagerzero:4000
+}

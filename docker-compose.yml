@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  pagerzero:
+    build: .
+    restart: unless-stopped
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - PUBLIC_URL=https://pagerzero.pro
+      - CALLE_API_KEY=${CALLE_API_KEY}
+      - CALLE_BASE_URL=${CALLE_BASE_URL:-https://api.heycall-e.com}
+      - ON_CALL_NAME=${ON_CALL_NAME:-Adam}
+      - ON_CALL_PHONE=${ON_CALL_PHONE}
+    ports:
+      - "4000:4000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - pagerzero
+
+volumes:
+  caddy_data:
+  caddy_config:

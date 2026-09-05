@@ -1,13 +1,15 @@
 # 🚨 PagerZero: Autonomous Voice-Approved Incident Remediation
 
 > **"Stay in bed while your AI agent investigates, fixes, or calls for one-word approval."**  
-> *Built for the [CALL-E: Your Code Is Calling](https://call-e.devpost.com/) Hackathon.*
+> 🌐 **Live Platform**: [https://pagerzero.pro](https://pagerzero.pro)  
+> 🏆 Built for the [CALL-E: Your Code Is Calling](https://call-e.devpost.com/) Hackathon.
 
+[![Domain](https://img.shields.io/badge/Live%20Domain-pagerzero.pro-10b981)](https://pagerzero.pro)
 [![CALL-E](https://img.shields.io/badge/CALL--E-SDK%20v0.7.0-emerald)](https://www.heycall-e.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.3-cyan)](https://reactjs.org/)
-[![Tailwind](https://img.shields.io/badge/Tailwind-3.4-teal)](https://tailwindcss.com/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ed)](Dockerfile)
 
 ---
 
@@ -25,9 +27,9 @@ Every software engineer and SRE dreads the 3:00 AM PagerDuty siren:
 
 ## ⚡ The Solution: PagerZero
 
-**PagerZero** is an intelligent on-call agent and pager replacement powered by **CALL-E**:
+**PagerZero** (`pagerzero.pro`) is an intelligent on-call agent and pager replacement powered by **CALL-E**:
 
-- **Autonomous SRE Reasoning**: Ingests alerts from Prometheus, Datadog, CloudWatch, or webhooks, diagnoses root causes, and identifies verified runbook actions.
+- **Autonomous SRE Reasoning**: Ingests alerts from Prometheus, Datadog, CloudWatch, or webhooks (`https://pagerzero.pro/api/alerts/webhook`), diagnoses root causes, and identifies verified runbook actions.
 - **Tier 1 (Safe Policy Auto-Remediation)**: For low-risk, idempotent runbooks (e.g. prune expired cache keys, compress full log partitions), PagerZero executes the remediation autonomously, verifies healthchecks clear, and records a post-mortem. **The on-call engineer sleeps undisturbed.**
 - **Tier 2 (CALL-E Voice Approval — Stay in Bed)**: For high-impact fixes (e.g. database connection pool recycle, cluster node scale, replica failover), PagerZero dials the engineer's mobile phone via CALL-E. The agent provides a concise 15-second voice brief:
   > *"Hi Adam, PagerZero here. Payments API DB connection pool is 98% saturated due to 4 hung queries. I can terminate the hung queries and recycle the pool now. Do you approve?"*
@@ -145,6 +147,27 @@ Run the complete Vitest test suite covering SRE diagnostics, cluster remediation
 ```bash
 npm test
 ```
+
+---
+
+## 🌐 Deploying to pagerzero.pro
+You can deploy PagerZero with automatic HTTPS on `pagerzero.pro` using Docker & Caddy or any container cloud:
+
+### Option A: Docker Compose + Caddy (Automatic HTTPS)
+1. Point your DNS A record for `pagerzero.pro` (and `www.pagerzero.pro`) to your server's public IP.
+2. Clone and start the containers:
+   ```bash
+   docker compose up -d --build
+   ```
+   Caddy will automatically provision a Let's Encrypt SSL certificate, route HTTPS traffic, and handle WebSockets seamlessly!
+
+### Option B: Cloud Platforms (Render, Railway, Fly.io)
+1. Connect your GitHub repository to [Render](https://render.com/), [Railway](https://railway.app/), or [Fly.io](https://fly.io/).
+2. Set environment variables:
+   - `NODE_ENV=production`
+   - `CALLE_API_KEY=...`
+   - `PUBLIC_URL=https://pagerzero.pro`
+3. Add `pagerzero.pro` in your platform's Custom Domains settings and update your DNS CNAME / A records as prompted.
 
 ---
 
