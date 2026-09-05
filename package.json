@@ -1,0 +1,47 @@
+{
+  "name": "pager-zero",
+  "version": "1.0.0",
+  "description": "PagerZero - Autonomous Voice-Approved Incident Remediation Pager built on CALL-E",
+  "main": "server/dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev:server": "tsx watch server/src/index.ts",
+    "dev:client": "npm --prefix client run dev",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "build:server": "tsc -p server/tsconfig.json",
+    "build:client": "npm --prefix client run build",
+    "build": "npm run build:server && npm run build:client",
+    "start": "node server/dist/index.js",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "call-e",
+    "pagerduty",
+    "oncall",
+    "sre",
+    "ai-agent",
+    "voice-ai",
+    "incident-remediation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@call-e/calle": "^0.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "uuid": "^11.1.0",
+    "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.13.10",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.14",
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  }
+}
