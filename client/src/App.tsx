@@ -7,7 +7,7 @@ import { IncidentCard } from './components/IncidentCard.js';
 import { LiveVoiceDrawer } from './components/LiveVoiceDrawer.js';
 import { PostMortemModal } from './components/PostMortemModal.js';
 import { SettingsModal } from './components/SettingsModal.js';
-import { PhoneCall, ShieldCheck, Activity, BedDouble, Trash2 } from 'lucide-react';
+
 
 export const App: React.FC = () => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -26,6 +26,7 @@ export const App: React.FC = () => {
   const [postMortemIncident, setPostMortemIncident] = useState<Incident | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
+  const [chaosMenuOpen, setChaosMenuOpen] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -231,12 +232,30 @@ export const App: React.FC = () => {
     await handleSaveConfig({ callMode: nextMode });
   };
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setChaosMenuOpen((v) => !v);
+      } else if (e.key === 'F2') {
+        handleTriggerChaos('db_pool_exhaustion');
+      } else if (e.key === 'F5') {
+        handleClearIncidents(e.shiftKey ? 'all' : 'resolved');
+      } else if (e.key === 'F9') {
+        handleToggleMode();
+      } else if (e.key === 'F10') {
+        setIsSettingsOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
+
   const activeIncidents = incidents.filter((i) => i.status !== 'RESOLVED');
   const resolvedIncidents = incidents.filter((i) => i.status === 'RESOLVED');
 
   return (
-    <div className="min-h-screen bg-[#0b0f17] text-slate-100 flex flex-col">
-      {/* Top Navigation */}
+    <div className="h-screen bg-crt-bg text-phosphor font-mono flex flex-col overflow-hidden">
       <Navbar
         config={config}
         services={services}
@@ -245,147 +264,77 @@ export const App: React.FC = () => {
         onToggleMode={handleToggleMode}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
-        {/* Hero Banner / Problem Statement */}
-        <div className="mb-6 p-6 rounded-2xl bg-gradient-to-r from-emerald-950/30 via-slate-900/60 to-indigo-950/30 border border-emerald-500/20 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold flex items-center gap-1">
-                <BedDouble className="w-3.5 h-3.5" /> Sleep-First On-Call Architecture
-              </span>
-              <span className="text-xs text-slate-400 font-mono">
-                {wsConnected ? '● Live WebSocket Connected' : '○ Connecting...'}
-              </span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              The Intelligent Pager Replacement That Lets You Stay in Bed.
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-3xl mt-1 leading-relaxed">
-              When alerts fire, PagerZero diagnoses root cause in seconds. Safe issues (disk full, cache expiration) are auto-remediated without waking you. High-impact fixes place a CALL-E voice call so you can approve with a single spoken word: <span className="text-emerald-400 font-semibold font-mono">"Approved"</span>.
-            </p>
-          </div>
+      <ChaosBar open={chaosMenuOpen} onTriggerChaos={handleTriggerChaos} />
 
-          <button
-            onClick={() => handleTriggerChaos('db_pool_exhaustion')}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition transform hover:-translate-y-0.5 whitespace-nowrap"
-          >
-            <PhoneCall className="w-4 h-4 animate-bounce" />
-            <span>Test Voice Call Outage</span>
-          </button>
-        </div>
-
-        {/* Chaos Outage Simulator Bar */}
-        <ChaosBar onTriggerChaos={handleTriggerChaos} />
-
-        {/* Live Cluster Health Grid */}
+      <main className="flex-1 grid md:grid-cols-2 gap-1 p-1 min-h-0">
         <ServiceClusterGrid services={services} />
-
-        {/* Incidents Section */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-lg font-bold text-white">Incident Stream</h2>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
-                {incidents.length} total ({activeIncidents.length} active)
-              </span>
-            </div>
-            {incidents.length > 0 && (
-              <div className="flex items-center gap-2">
-                {resolvedIncidents.length > 0 && (
-                  <button
-                    onClick={() => handleClearIncidents('resolved')}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-                  >
-                    Clear resolved
-                  </button>
-                )}
-                <button
-                  onClick={() => handleClearIncidents('all')}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/30 transition"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Clear all
-                </button>
+        <section className="border border-crt-line bg-crt-panel flex flex-col min-h-0 overflow-hidden">
+          <div className="px-2 py-1 border-b border-crt-line text-phosphor-dim text-xs">
+            INCIDENTS {activeIncidents.length} active / {incidents.length} total
+          </div>
+          <div className="flex-1 overflow-auto">
+            {incidents.length === 0 ? (
+              <div className="p-4 text-phosphor-dim text-xs">
+                NO INCIDENTS. F1 CHAOS TO INJECT.
               </div>
+            ) : (
+              <>
+                {activeIncidents.map((inc) => (
+                  <IncidentCard
+                    key={inc.id}
+                    incident={inc}
+                    onOpenVoiceDrawer={(i) => setActiveVoiceIncident(i)}
+                    onOpenPostMortem={(i) => setPostMortemIncident(i)}
+                    onDismiss={handleDeleteIncident}
+                  />
+                ))}
+                {resolvedIncidents.map((inc) => (
+                  <IncidentCard
+                    key={inc.id}
+                    incident={inc}
+                    onOpenVoiceDrawer={(i) => setActiveVoiceIncident(i)}
+                    onOpenPostMortem={(i) => setPostMortemIncident(i)}
+                    onDismiss={handleDeleteIncident}
+                  />
+                ))}
+              </>
             )}
           </div>
-
-          {/* Active Incidents Feed */}
-          {activeIncidents.length > 0 && (
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-3 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                Active / In Progress Incidents
-              </h3>
-              {activeIncidents.map((inc) => (
-                <IncidentCard
-                  key={inc.id}
-                  incident={inc}
-                  onOpenVoiceDrawer={(i) => setActiveVoiceIncident(i)}
-                  onOpenPostMortem={(i) => setPostMortemIncident(i)}
-                  onDismiss={handleDeleteIncident}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Resolved Incidents Feed */}
-          {resolvedIncidents.length > 0 && (
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-3 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4" />
-                Auto-Remediated & Resolved Incidents
-              </h3>
-              {resolvedIncidents.map((inc) => (
-                <IncidentCard
-                  key={inc.id}
-                  incident={inc}
-                  onOpenVoiceDrawer={(i) => setActiveVoiceIncident(i)}
-                  onOpenPostMortem={(i) => setPostMortemIncident(i)}
-                  onDismiss={handleDeleteIncident}
-                />
-              ))}
-            </div>
-          )}
-
-          {incidents.length === 0 && (
-            <div className="p-12 text-center rounded-2xl bg-slate-900/40 border border-slate-800/80">
-              <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto mb-3">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-bold text-white mb-1">
-                Zero Incidents Active
-              </h3>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto mb-4">
-                The cluster is running smoothly and the on-call engineer is fast asleep. Use the chaos simulator above to inject an outage.
-              </p>
-              <button
-                onClick={() => handleTriggerChaos('disk_full')}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
-              >
-                Trigger Test Alert (Disk Full - Tier 1 Auto-Fix)
-              </button>
-            </div>
-          )}
-        </div>
+        </section>
       </main>
 
-      {/* Voice Call Drawer / Modal */}
+      <nav className="h-8 px-3 flex items-center gap-4 border-t border-crt-line bg-crt-bar text-xs font-mono text-phosphor-dim">
+        <button type="button" onClick={() => setChaosMenuOpen((v) => !v)}>
+          F1 Chaos
+        </button>
+        <button type="button" onClick={() => handleTriggerChaos('db_pool_exhaustion')}>
+          F2 Voice test
+        </button>
+        <button type="button" onClick={() => handleClearIncidents('resolved')}>
+          F5 Clear resolved
+        </button>
+        <button type="button" onClick={() => handleClearIncidents('all')}>
+          Shift+F5 Clear all
+        </button>
+        <button type="button" onClick={handleToggleMode}>
+          F9 {config.callMode === 'calle_live' ? 'LIVE' : 'SIM'}
+        </button>
+        <button type="button" onClick={() => setIsSettingsOpen(true)}>
+          F10 Settings
+        </button>
+      </nav>
+
       <LiveVoiceDrawer
         incident={activeVoiceIncident}
         onClose={() => setActiveVoiceIncident(null)}
         onSubmitVoiceDecision={handleSubmitVoiceDecision}
       />
 
-      {/* Post-Mortem Report Modal */}
       <PostMortemModal
         incident={postMortemIncident}
         onClose={() => setPostMortemIncident(null)}
       />
 
-      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -393,11 +342,6 @@ export const App: React.FC = () => {
         onSaveConfig={handleSaveConfig}
         onSaveApiKey={handleSaveApiKey}
       />
-
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 py-4 px-6 text-center text-xs text-slate-500 bg-[#080d16]">
-        PagerZero · Autonomous SRE & Voice-Approved Incident Remediation · Built on CALL-E Developer SDK
-      </footer>
     </div>
   );
 };
