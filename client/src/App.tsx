@@ -240,6 +240,7 @@ export const App: React.FC = () => {
       <Navbar
         config={config}
         services={services}
+        wsConnected={wsConnected}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onToggleMode={handleToggleMode}
       />
