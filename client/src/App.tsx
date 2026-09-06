@@ -260,7 +260,7 @@ export const App: React.FC = () => {
   const resolvedIncidents = incidents.filter((i) => i.status === 'RESOLVED');
 
   return (
-    <div className="h-screen bg-crt-bg text-phosphor font-mono flex flex-col overflow-hidden">
+    <div className="h-screen bg-crt-bg text-phosphor font-mono flex flex-col overflow-hidden min-h-0">
       <Navbar
         config={config}
         services={services}
