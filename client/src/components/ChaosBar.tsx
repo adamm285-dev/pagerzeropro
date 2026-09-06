@@ -2,10 +2,9 @@ import React, { useState } from 'react';
 
 interface ChaosBarProps {
   onTriggerChaos: (scenario: string) => Promise<void>;
-  open: boolean;
 }
 
-export const ChaosBar: React.FC<ChaosBarProps> = ({ onTriggerChaos, open }) => {
+export const ChaosBar: React.FC<ChaosBarProps> = ({ onTriggerChaos }) => {
   const [loadingScenario, setLoadingScenario] = useState<string | null>(null);
 
   const handleTrigger = async (scenario: string) => {
@@ -18,31 +17,59 @@ export const ChaosBar: React.FC<ChaosBarProps> = ({ onTriggerChaos, open }) => {
   };
 
   const scenarios = [
-    { id: 'disk_full', label: 'disk_full', tier: 'T1' },
-    { id: 'db_pool_exhaustion', label: 'db_pool_exhaustion', tier: 'T2' },
-    { id: 'redis_memory_saturation', label: 'redis_memory_saturation', tier: 'T1' },
-    { id: 'memory_leak_oom', label: 'memory_leak_oom', tier: 'T2' },
-    { id: 'upstream_502', label: 'upstream_502', tier: 'T2' },
+    {
+      id: 'disk_full',
+      title: 'Disk 96% full',
+      hint: 'T1 auto-fix',
+      accent: 'border-crt-line text-phosphor hover:bg-phosphor/10',
+    },
+    {
+      id: 'db_pool_exhaustion',
+      title: 'DB pool full',
+      hint: 'T2 VOICE',
+      accent: 'border-amber-term text-amber-term hover:bg-amber-term/10',
+    },
+    {
+      id: 'redis_memory_saturation',
+      title: 'Redis memory',
+      hint: 'T1 auto-fix',
+      accent: 'border-crt-line text-phosphor hover:bg-phosphor/10',
+    },
+    {
+      id: 'memory_leak_oom',
+      title: 'Auth OOM',
+      hint: 'T2 VOICE',
+      accent: 'border-amber-term text-amber-term hover:bg-amber-term/10',
+    },
+    {
+      id: 'upstream_502',
+      title: 'Gateway 502',
+      hint: 'T2 VOICE',
+      accent: 'border-amber-term text-amber-term hover:bg-amber-term/10',
+    },
   ];
 
-  if (!open) return null;
-
   return (
-    <div className="px-3 py-1 border-b border-crt-line bg-crt-bar text-xs font-mono text-phosphor flex flex-wrap items-center gap-2">
-      {scenarios.map((sc) => {
-        const isLoading = loadingScenario === sc.id;
-        return (
-          <button
-            key={sc.id}
-            type="button"
-            disabled={Boolean(loadingScenario)}
-            onClick={() => handleTrigger(sc.id)}
-            className="border border-crt-line px-2 py-0.5 hover:bg-crt-panel disabled:opacity-50"
-          >
-            {isLoading ? '...' : `${sc.tier} ${sc.label}`}
-          </button>
-        );
-      })}
+    <div className="border-b border-crt-line bg-crt-bar px-3 py-2 font-mono">
+      <div className="text-[10px] uppercase tracking-widest text-phosphor-dim mb-1">
+        Inject outage — click a scenario (T2 rings the phone)
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {scenarios.map((sc) => {
+          const isLoading = loadingScenario === sc.id;
+          return (
+            <button
+              key={sc.id}
+              type="button"
+              disabled={Boolean(loadingScenario)}
+              onClick={() => handleTrigger(sc.id)}
+              className={`border px-2 py-1 text-xs disabled:opacity-50 ${sc.accent}`}
+            >
+              {isLoading ? '… firing' : `${sc.title}  ${sc.hint}`}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 };

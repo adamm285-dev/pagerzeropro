@@ -26,7 +26,6 @@ export const App: React.FC = () => {
   const [postMortemIncident, setPostMortemIncident] = useState<Incident | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
-  const [chaosMenuOpen, setChaosMenuOpen] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -236,7 +235,7 @@ export const App: React.FC = () => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F1') {
         e.preventDefault();
-        setChaosMenuOpen((v) => !v);
+        handleTriggerChaos('disk_full');
       } else if (e.key === 'F2') {
         e.preventDefault();
         handleTriggerChaos('db_pool_exhaustion');
@@ -270,7 +269,45 @@ export const App: React.FC = () => {
         onToggleMode={handleToggleMode}
       />
 
-      <ChaosBar open={chaosMenuOpen} onTriggerChaos={handleTriggerChaos} />
+      <div className="border-b border-crt-line bg-crt-bar px-3 py-2 flex flex-wrap items-center gap-2 text-xs font-mono">
+        <button
+          type="button"
+          onClick={() => handleTriggerChaos('db_pool_exhaustion')}
+          className="border-2 border-amber-term text-amber-term px-3 py-1.5 hover:bg-amber-term/10 uppercase tracking-wide"
+        >
+          Test voice call
+        </button>
+        <button
+          type="button"
+          onClick={handleToggleMode}
+          className="border border-crt-line px-2 py-1.5 text-phosphor hover:bg-phosphor/10"
+        >
+          Mode: {config.callMode === 'calle_live' ? 'LIVE CALL-E' : 'SIMULATOR'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsSettingsOpen(true)}
+          className="border border-crt-line px-2 py-1.5 text-phosphor hover:bg-phosphor/10"
+        >
+          Settings
+        </button>
+        <button
+          type="button"
+          onClick={() => handleClearIncidents('resolved')}
+          className="border border-crt-line px-2 py-1.5 text-phosphor-dim hover:bg-phosphor/10"
+        >
+          Clear resolved
+        </button>
+        <button
+          type="button"
+          onClick={() => handleClearIncidents('all')}
+          className="border border-red-term px-2 py-1.5 text-red-term hover:bg-red-term/10"
+        >
+          Clear all
+        </button>
+      </div>
+
+      <ChaosBar onTriggerChaos={handleTriggerChaos} />
 
       <main className="flex-1 grid md:grid-cols-2 gap-1 p-1 min-h-0">
         <ServiceClusterGrid services={services} />
@@ -281,7 +318,7 @@ export const App: React.FC = () => {
           <div className="flex-1 overflow-auto">
             {incidents.length === 0 ? (
               <div className="p-4 text-phosphor-dim text-xs">
-                NO INCIDENTS. F1 CHAOS TO INJECT.
+                NO INCIDENTS. Use TEST VOICE CALL or a scenario above.
               </div>
             ) : (
               <>
@@ -308,27 +345,6 @@ export const App: React.FC = () => {
           </div>
         </section>
       </main>
-
-      <nav className="h-8 px-3 flex items-center gap-4 border-t border-crt-line bg-crt-bar text-xs font-mono text-phosphor-dim">
-        <button type="button" onClick={() => setChaosMenuOpen((v) => !v)}>
-          F1 Chaos
-        </button>
-        <button type="button" onClick={() => handleTriggerChaos('db_pool_exhaustion')}>
-          F2 Voice test
-        </button>
-        <button type="button" onClick={() => handleClearIncidents('resolved')}>
-          F5 Clear resolved
-        </button>
-        <button type="button" onClick={() => handleClearIncidents('all')}>
-          Shift+F5 Clear all
-        </button>
-        <button type="button" onClick={handleToggleMode}>
-          F9 {config.callMode === 'calle_live' ? 'LIVE' : 'SIM'}
-        </button>
-        <button type="button" onClick={() => setIsSettingsOpen(true)}>
-          F10 Settings
-        </button>
-      </nav>
 
       <LiveVoiceDrawer
         incident={activeVoiceIncident}
