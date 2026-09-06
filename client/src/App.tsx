@@ -238,13 +238,19 @@ export const App: React.FC = () => {
         e.preventDefault();
         setChaosMenuOpen((v) => !v);
       } else if (e.key === 'F2') {
+        e.preventDefault();
         handleTriggerChaos('db_pool_exhaustion');
       } else if (e.key === 'F5') {
+        e.preventDefault();
         handleClearIncidents(e.shiftKey ? 'all' : 'resolved');
       } else if (e.key === 'F9') {
+        e.preventDefault();
         handleToggleMode();
       } else if (e.key === 'F10') {
+        e.preventDefault();
         setIsSettingsOpen(true);
+      } else if (e.key === 'Escape') {
+        setActiveVoiceIncident(null);
       }
     };
     window.addEventListener('keydown', onKeyDown);
