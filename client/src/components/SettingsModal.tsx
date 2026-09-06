@@ -22,6 +22,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [callMode, setCallMode] = useState(config.callMode);
   const [autoApproveTier1, setAutoApproveTier1] = useState(config.autoApproveTier1);
   const [calleApiKey, setCalleApiKey] = useState('');
+  const [quietHoursEnabled, setQuietHoursEnabled] = useState(config.quietHours.enabled);
+  const [quietHoursStart, setQuietHoursStart] = useState(config.quietHours.start);
+  const [quietHoursEnd, setQuietHoursEnd] = useState(config.quietHours.end);
+  const [escalationTimeoutSeconds, setEscalationTimeoutSeconds] = useState(
+    config.escalationTimeoutSeconds
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -29,6 +35,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setPhoneNumber(config.phoneNumber);
     setCallMode(config.callMode);
     setAutoApproveTier1(config.autoApproveTier1);
+    setQuietHoursEnabled(config.quietHours.enabled);
+    setQuietHoursStart(config.quietHours.start);
+    setQuietHoursEnd(config.quietHours.end);
+    setEscalationTimeoutSeconds(config.escalationTimeoutSeconds);
   }, [config, isOpen]);
 
   if (!isOpen) return null;
@@ -42,6 +52,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         phoneNumber,
         callMode,
         autoApproveTier1,
+        quietHours: {
+          enabled: quietHoursEnabled,
+          start: quietHoursStart,
+          end: quietHoursEnd,
+        },
+        escalationTimeoutSeconds,
       });
 
       if (calleApiKey.trim()) {
@@ -54,33 +70,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const inputClass =
+    'w-full px-3 py-2 bg-crt-bg border border-crt-line text-phosphor text-xs font-mono outline-none focus:border-phosphor';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-      <div className="relative w-full max-w-xl bg-[#0e1626] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+      <div className="relative w-full max-w-xl border border-crt-line bg-crt-panel font-mono text-phosphor overflow-hidden">
+        <div className="px-6 py-4 border-b border-crt-line flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Settings className="w-5 h-5 text-emerald-400" />
-            <h3 className="text-base font-bold text-white">
-              On-Call Roster & CALL-E Configuration
+            <Settings className="w-5 h-5 text-phosphor" />
+            <h3 className="text-base font-bold tracking-widest">
+              ON-CALL ROSTER &amp; CALL-E CONFIG
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 text-phosphor-dim hover:text-phosphor hover:bg-crt-bg"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* CALL-E API Key */}
           <div>
-            <label className="text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-              <Key className="w-3.5 h-3.5 text-amber-400" />
-              CALL-E API Key
-              <span className="text-[10px] font-normal text-slate-400">
+            <label className="text-xs font-bold text-phosphor mb-1 flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5" />
+              CALL-E API KEY
+              <span className="text-[10px] font-normal text-phosphor-dim">
                 (Optional: leave blank for built-in Voice Simulator)
               </span>
             </label>
@@ -89,33 +105,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               placeholder={config.hasCalleApiKey ? '•••••••••••••••• (Key Configured)' : 'Enter CALLE_API_KEY from heycall-e.com'}
               value={calleApiKey}
               onChange={(e) => setCalleApiKey(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-emerald-500 text-slate-200 text-xs font-mono outline-none transition"
+              className={inputClass}
             />
-            <p className="text-[11px] text-slate-400 mt-1">
-              Sign up at <a href="https://www.heycall-e.com/" target="_blank" rel="noreferrer" className="text-emerald-400 underline">heycall-e.com</a> to get 20 free phone calls.
+            <p className="text-[11px] text-phosphor-dim mt-1">
+              Sign up at{' '}
+              <a href="https://www.heycall-e.com/" target="_blank" rel="noreferrer" className="text-phosphor underline">
+                heycall-e.com
+              </a>{' '}
+              to get 20 free phone calls.
             </p>
           </div>
 
-          {/* Engineer Name */}
           <div>
-            <label className="text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-cyan-400" />
-              On-Call Engineer Name
+            <label className="text-xs font-bold text-phosphor mb-1 flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5" />
+              ON-CALL ENGINEER NAME
             </label>
             <input
               type="text"
               required
               value={engineerName}
               onChange={(e) => setEngineerName(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-emerald-500 text-slate-200 text-xs outline-none transition"
+              className={inputClass}
             />
           </div>
 
-          {/* Phone Number */}
           <div>
-            <label className="text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5 text-emerald-400" />
-              Mobile Phone Number (E.164 Format)
+            <label className="text-xs font-bold text-phosphor mb-1 flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5" />
+              MOBILE PHONE NUMBER (E.164)
             </label>
             <input
               type="text"
@@ -123,26 +141,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               placeholder="+15551234567"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-emerald-500 text-slate-200 text-xs font-mono outline-none transition"
+              className={inputClass}
             />
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-[11px] text-phosphor-dim mt-1">
               For real outbound phone calls, include country code (e.g., +1 for US/Canada).
             </p>
           </div>
 
-          {/* Call Mode Switcher */}
           <div>
-            <label className="text-xs font-bold text-slate-300 mb-1 block">
-              Default Calling Mode
-            </label>
+            <label className="text-xs font-bold text-phosphor mb-1 block">DEFAULT CALLING MODE</label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setCallMode('voice_simulator')}
-                className={`py-2.5 px-3 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition ${
+                className={`py-2.5 px-3 border text-xs font-semibold flex flex-col items-center gap-1 ${
                   callMode === 'voice_simulator'
-                    ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400'
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-crt-bg border-phosphor text-phosphor'
+                    : 'bg-crt-bg border-crt-line text-phosphor-dim hover:text-phosphor'
                 }`}
               >
                 <span>Voice Simulator (Browser Audio)</span>
@@ -152,10 +167,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 type="button"
                 onClick={() => setCallMode('calle_live')}
-                className={`py-2.5 px-3 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition ${
+                className={`py-2.5 px-3 border text-xs font-semibold flex flex-col items-center gap-1 ${
                   callMode === 'calle_live'
-                    ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-crt-bg border-phosphor text-phosphor'
+                    : 'bg-crt-bg border-crt-line text-phosphor-dim hover:text-phosphor'
                 }`}
               >
                 <span>Live CALL-E Dialing</span>
@@ -164,43 +179,88 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Auto-Approve Tier 1 Policy */}
-          <div className="pt-2 border-t border-slate-800">
+          <div>
+            <label className="text-xs font-bold text-phosphor mb-1 block">QUIET HOURS</label>
+            <label className="flex items-center gap-2 text-xs cursor-pointer mb-2">
+              <input
+                type="checkbox"
+                checked={quietHoursEnabled}
+                onChange={(e) => setQuietHoursEnabled(e.target.checked)}
+                className="bg-crt-bg border-crt-line text-phosphor"
+              />
+              <span>Enabled</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-phosphor-dim">START</label>
+                <input
+                  type="time"
+                  value={quietHoursStart}
+                  onChange={(e) => setQuietHoursStart(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-phosphor-dim">END</label>
+                <input
+                  type="time"
+                  value={quietHoursEnd}
+                  onChange={(e) => setQuietHoursEnd(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-phosphor mb-1 block">
+              ESCALATION TIMEOUT (SECONDS)
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={escalationTimeoutSeconds}
+              onChange={(e) => setEscalationTimeoutSeconds(Number(e.target.value))}
+              className={inputClass}
+            />
+          </div>
+
+          <div className="pt-2 border-t border-crt-line">
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={autoApproveTier1}
                 onChange={(e) => setAutoApproveTier1(e.target.checked)}
-                className="mt-1 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500"
+                className="mt-1 bg-crt-bg border-crt-line text-phosphor"
               />
               <div className="text-xs">
-                <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  Enable Sleep Policy (Autonomous Tier 1 Remediation)
+                <span className="font-bold text-phosphor flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  ENABLE SLEEP POLICY (AUTONOMOUS TIER 1)
                 </span>
-                <p className="text-slate-400 mt-0.5">
-                  When verified safe idempotent runbooks match (e.g. disk log prune, cache flush), remediate without ringing or waking the on-call engineer.
+                <p className="text-phosphor-dim mt-0.5">
+                  When verified safe idempotent runbooks match (e.g. disk log prune, cache flush),
+                  remediate without ringing or waking the on-call engineer.
                 </p>
               </div>
             </label>
           </div>
 
-          {/* Buttons */}
-          <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
+          <div className="pt-4 flex items-center justify-end gap-3 border-t border-crt-line">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              className="px-4 py-2 border border-crt-line text-xs text-phosphor-dim hover:text-phosphor hover:bg-crt-bg"
             >
-              Cancel
+              [ CANCEL ]
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition disabled:opacity-50"
+              className="flex items-center gap-1.5 px-5 py-2 border border-phosphor bg-crt-bg text-phosphor text-xs font-bold hover:bg-phosphor hover:text-crt-bg disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>{saving ? 'Saving...' : 'Save Settings'}</span>
+              <span>{saving ? 'SAVING...' : '[ SAVE SETTINGS ]'}</span>
             </button>
           </div>
         </form>
