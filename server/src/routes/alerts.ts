@@ -5,28 +5,62 @@ import { AlertPayload } from '../types.js';
 
 export const alertsRouter = Router();
 
-// Generic webhook for Alertmanager / Datadog / CloudWatch / PagerDuty
-alertsRouter.post('/webhook', async (req: Request, res: Response) => {
-  const body = req.body;
-  const alert: AlertPayload = {
-    id: body.id || `alert-${Date.now()}`,
-    source: body.source || 'alertmanager',
-    service: body.service || 'payments-api',
-    severity: body.severity || 'P1',
-    title: body.title || 'Service Health Degraded',
-    description: body.description || 'Threshold exceeded on primary healthcheck',
-    metric: body.metric || 'latency_ms',
-    currentValue: body.currentValue || 1500,
-    thresholdValue: body.thresholdValue || 500,
-    timestamp: new Date().toISOString(),
-    labels: body.labels || {},
-  };
+function normalizeWebhook(body: any): AlertPayload[] {
+  if (Array.isArray(body?.alerts)) {
+    return body.alerts
+      .filter((a: any) => (a.status || 'firing') !== 'resolved')
+      .map((a: any) => {
+        const labels = a.labels || {};
+        const annotations = a.annotations || {};
+        return {
+          id: a.fingerprint || `am-${Date.now()}`,
+          source: 'alertmanager' as const,
+          service: labels.service || labels.job || labels.instance || 'unknown-service',
+          severity: (labels.severity === 'critical' ? 'P1' : labels.severity === 'warning' ? 'P2' : 'P1') as AlertPayload['severity'],
+          title: annotations.summary || labels.alertname || 'Alertmanager firing',
+          description: annotations.description || annotations.summary || 'Prometheus alert firing',
+          metric: labels.metric || labels.alertname || 'alert',
+          currentValue: Number(annotations.currentValue ?? annotations.value ?? 1),
+          thresholdValue: Number(annotations.threshold ?? 0),
+          timestamp: a.startsAt || new Date().toISOString(),
+          labels,
+        };
+      });
+  }
 
-  const incident = await incidentManager.handleAlert(alert);
+  return [
+    {
+      id: body.id || `alert-${Date.now()}`,
+      source: body.source || 'alertmanager',
+      service: body.service || body.labels?.service || 'unknown-service',
+      severity: body.severity || 'P1',
+      title: body.title || body.alertname || 'Service Health Degraded',
+      description: body.description || body.message || 'Threshold exceeded',
+      metric: body.metric || 'latency_ms',
+      currentValue: body.currentValue ?? 1500,
+      thresholdValue: body.thresholdValue ?? 500,
+      timestamp: new Date().toISOString(),
+      labels: body.labels || {},
+    },
+  ];
+}
+
+alertsRouter.post('/webhook', async (req: Request, res: Response) => {
+  const alerts = normalizeWebhook(req.body);
+  if (alerts.length === 0) {
+    res.status(202).json({ status: 'ignored', reason: 'no firing alerts' });
+    return;
+  }
+
+  const incidents = [];
+  for (const alert of alerts) {
+    incidents.push(await incidentManager.handleAlert(alert));
+  }
+
   res.status(202).json({
     status: 'received',
-    incidentId: incident.id,
-    alertTitle: alert.title,
+    incidentIds: incidents.map((i) => i.id),
+    count: incidents.length,
   });
 });
 

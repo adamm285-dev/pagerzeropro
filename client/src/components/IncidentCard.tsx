@@ -12,19 +12,22 @@ import {
   Terminal, 
   BedDouble, 
   Zap, 
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react';
 
 interface IncidentCardProps {
   incident: Incident;
   onOpenVoiceDrawer: (incident: Incident) => void;
   onOpenPostMortem: (incident: Incident) => void;
+  onDismiss?: (id: string) => void;
 }
 
 export const IncidentCard: React.FC<IncidentCardProps> = ({
   incident,
   onOpenVoiceDrawer,
   onOpenPostMortem,
+  onDismiss,
 }) => {
   const [expanded, setExpanded] = useState(true);
 
@@ -117,6 +120,15 @@ export const IncidentCard: React.FC<IncidentCardProps> = ({
 
         <div className="flex items-center gap-2 self-end sm:self-center">
           {getStatusBadge()}
+          {onDismiss && (
+            <button
+              title="Remove incident"
+              onClick={() => onDismiss(incident.id)}
+              className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={() => setExpanded(!expanded)}
             className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition"

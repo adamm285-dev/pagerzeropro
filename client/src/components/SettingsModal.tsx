@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { OnCallConfig } from '../types.js';
 import { Settings, Key, Phone, User, ShieldCheck, X, Save } from 'lucide-react';
 
@@ -23,6 +23,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [autoApproveTier1, setAutoApproveTier1] = useState(config.autoApproveTier1);
   const [calleApiKey, setCalleApiKey] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setEngineerName(config.engineerName);
+    setPhoneNumber(config.phoneNumber);
+    setCallMode(config.callMode);
+    setAutoApproveTier1(config.autoApproveTier1);
+  }, [config, isOpen]);
 
   if (!isOpen) return null;
 

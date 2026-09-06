@@ -13,9 +13,15 @@ import { calleService } from './calle.js';
 
 type IncidentListener = (event: { type: string; incident: Incident; data?: any }) => void;
 
+type VoiceDecision = {
+  approvalStatus: 'approved' | 'rejected' | 'escalate';
+  spokenInstructions: string;
+};
+
 class IncidentManager {
   private incidents: Map<string, Incident> = new Map();
   private listeners: Set<IncidentListener> = new Set();
+  private voiceWaiters: Map<string, { resolve: (decision: VoiceDecision | null) => void; timer: ReturnType<typeof setTimeout> }> = new Map();
   
   public config: OnCallConfig = {
     engineerName: process.env.ON_CALL_NAME || 'Adam (Primary SRE)',
@@ -59,6 +65,52 @@ class IncidentManager {
     return this.incidents.get(id);
   }
 
+  public clearIncidents(scope: 'resolved' | 'all' = 'resolved'): { cleared: number; remaining: number } {
+    const ids = Array.from(this.incidents.values())
+      .filter((inc) => scope === 'all' || inc.status === 'RESOLVED' || inc.status === 'ESCALATED')
+      .map((inc) => inc.id);
+
+    for (const id of ids) {
+      this.cancelVoiceWait(id);
+      this.incidents.delete(id);
+    }
+
+    this.broadcastListCleared(scope, ids);
+    return { cleared: ids.length, remaining: this.incidents.size };
+  }
+
+  public deleteIncident(id: string): boolean {
+    const existing = this.incidents.get(id);
+    if (!existing) return false;
+    this.cancelVoiceWait(id);
+    this.incidents.delete(id);
+    this.broadcastListCleared('one', [id]);
+    return true;
+  }
+
+  private broadcastListCleared(scope: string, ids: string[]) {
+    const empty = {
+      id: 'cleared',
+      alert: {} as Incident['alert'],
+      status: 'RESOLVED' as const,
+      riskTier: 'TIER_1_AUTO' as const,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      timeline: [],
+    };
+    for (const listener of this.listeners) {
+      try {
+        listener({
+          type: 'incidents_cleared',
+          incident: empty,
+          data: { scope, ids, incidents: this.getAll() },
+        });
+      } catch (err) {
+        console.error('Error in incident listener:', err);
+      }
+    }
+  }
+
   public updateConfig(newConfig: Partial<OnCallConfig>) {
     this.config = { ...this.config, ...newConfig };
     return this.config;
@@ -68,7 +120,7 @@ class IncidentManager {
    * Main Alert Ingestion and Autonomous Decision Pipeline
    */
   public async handleAlert(alert: AlertPayload): Promise<Incident> {
-    const incidentId = `inc-${Date.now().toString().slice(-6)}`;
+    const incidentId = `inc-${uuidv4().slice(0, 8)}`;
     const now = new Date().toISOString();
 
     const incident: Incident = {
@@ -114,7 +166,12 @@ class IncidentManager {
     this.broadcast('incident_diagnosed', incident);
 
     // Step 2: Policy Decision based on Risk Tier
-    if (diagnosis.riskTier === 'TIER_1_AUTO' && this.config.autoApproveTier1) {
+    const autoFixTier1 = diagnosis.riskTier === 'TIER_1_AUTO' && this.config.autoApproveTier1;
+    const needsVoice =
+      diagnosis.riskTier === 'TIER_2_VOICE_APPROVAL' ||
+      (diagnosis.riskTier === 'TIER_1_AUTO' && !this.config.autoApproveTier1);
+
+    if (autoFixTier1) {
       // PATH A: Tier 1 Auto-Remediation (Stay Asleep!)
       this.updateStatus(
         incident,
@@ -123,7 +180,10 @@ class IncidentManager {
       );
       await this.executeRemediation(incident);
 
-    } else if (diagnosis.riskTier === 'TIER_2_VOICE_APPROVAL') {
+    } else if (needsVoice) {
+      const timeoutMs = Math.max(5, this.config.escalationTimeoutSeconds) * 1000;
+      const decisionPromise = this.waitForVoiceDecision(incident.id, timeoutMs);
+
       // PATH B: Tier 2 Voice Approval via CALL-E ("Stay in Bed")
       this.updateStatus(
         incident,
@@ -132,52 +192,150 @@ class IncidentManager {
       );
 
       incident.voiceCall = {
-        callId: `call-${Date.now()}`,
+        callId: `call-${uuidv4().slice(0, 8)}`,
         phone: this.config.phoneNumber,
         provider: this.config.callMode,
         status: 'ringing',
         startedAt: new Date().toISOString(),
+        result: {
+          callId: '',
+          status: 'in_progress',
+          approvalStatus: 'unreachable',
+          confidence: 0,
+          durationSeconds: 0,
+          transcript: [],
+          summary: '',
+        },
       };
+      if (incident.voiceCall.result) {
+        incident.voiceCall.result.callId = incident.voiceCall.callId;
+      }
       this.broadcast('voice_call_started', incident);
 
-      // Perform the phone call
-      const callResult = await calleService.executeCall(
-        {
-          incidentId: incident.id,
-          serviceName: incident.alert.service,
-          engineerName: this.config.engineerName,
-          phoneNumber: this.config.phoneNumber,
-          voiceScript: diagnosis.voicePromptScript,
-          actionName: diagnosis.recommendedAction.name,
-          liveMode: this.config.callMode === 'calle_live',
-        },
-        (turn: VoiceCallTurn) => {
-          this.broadcast('voice_call_turn', incident, turn);
-        }
-      );
+      const liveMode = this.config.callMode === 'calle_live' && calleService.hasValidApiKey();
 
-      incident.voiceCall.result = callResult;
-      incident.voiceCall.status = callResult.status === 'completed' ? 'completed' : 'failed';
-      incident.voiceCall.completedAt = new Date().toISOString();
-
-      if (callResult.approvalStatus === 'approved') {
-        this.updateStatus(
-          incident,
-          'EXECUTING_REMEDIATION',
-          `Voice Approval Received from ${this.config.engineerName}: "${callResult.spokenInstructions}". Executing approved action.`
+      if (liveMode) {
+        const callPromise = calleService.executeCall(
+          {
+            incidentId: incident.id,
+            serviceName: incident.alert.service,
+            engineerName: this.config.engineerName,
+            phoneNumber: this.config.phoneNumber,
+            voiceScript: diagnosis.voicePromptScript,
+            actionName: diagnosis.recommendedAction.name,
+            liveMode: true,
+          },
+          (turn: VoiceCallTurn) => this.appendCallTurn(incident, turn)
         );
-        await this.executeRemediation(incident);
-      } else if (callResult.approvalStatus === 'rejected') {
+
+        const winner = await Promise.race([
+          decisionPromise.then((d) => ({ kind: 'dashboard' as const, decision: d })),
+          callPromise.then((c) => ({ kind: 'calle' as const, call: c })),
+        ]);
+
+        if (winner.kind === 'dashboard' && winner.decision) {
+          this.applyCallResult(incident, {
+            callId: incident.voiceCall.callId,
+            status: 'completed',
+            approvalStatus: winner.decision.approvalStatus,
+            spokenInstructions: winner.decision.spokenInstructions,
+            confidence: 0.99,
+            durationSeconds: 15,
+            transcript: incident.voiceCall.result?.transcript || [],
+            summary: `Engineer approved from the dashboard while CALL-E was dialing.`,
+          });
+          if (winner.decision.approvalStatus === 'approved') {
+            this.updateStatus(
+              incident,
+              'EXECUTING_REMEDIATION',
+              `Voice Approval Received from ${this.config.engineerName}: "${winner.decision.spokenInstructions}". Executing approved action.`
+            );
+            await this.executeRemediation(incident);
+          } else {
+            this.updateStatus(
+              incident,
+              'ESCALATED',
+              `Engineer responded "${winner.decision.approvalStatus}". Escalating.`
+            );
+          }
+          return;
+        }
+
+        if (winner.kind === 'calle') {
+          this.cancelVoiceWait(incident.id);
+          this.applyCallResult(incident, winner.call);
+          if (winner.call.approvalStatus === 'approved') {
+            this.updateStatus(
+              incident,
+              'EXECUTING_REMEDIATION',
+              `Voice Approval Received from ${this.config.engineerName}: "${winner.call.spokenInstructions}". Executing approved action.`
+            );
+            await this.executeRemediation(incident);
+          } else {
+            this.updateStatus(
+              incident,
+              'ESCALATED',
+              `Voice call outcome: ${winner.call.approvalStatus}. Escalating incident.`
+            );
+          }
+          return;
+        }
+
         this.updateStatus(
           incident,
           'ESCALATED',
-          `Engineer explicitly rejected remediation ("${callResult.spokenInstructions}"). Escalating to secondary on-call.`
+          `No spoken approval within ${this.config.escalationTimeoutSeconds}s. Escalating to secondary on-call.`
         );
+        return;
+      }
+
+      // Voice simulator: speak the prompt, then wait for dashboard / mic decision.
+      this.appendCallTurn(incident, {
+        speaker: 'agent',
+        text: diagnosis.voicePromptScript,
+        timestamp: new Date().toISOString(),
+      });
+      incident.voiceCall.status = 'in_progress';
+      this.broadcast('incident_updated', incident);
+
+      const decision = await decisionPromise;
+
+      if (!decision) {
+        this.updateStatus(
+          incident,
+          'ESCALATED',
+          `No spoken approval within ${this.config.escalationTimeoutSeconds}s. Escalating to secondary on-call.`
+        );
+        if (incident.voiceCall) {
+          incident.voiceCall.status = 'failed';
+          incident.voiceCall.completedAt = new Date().toISOString();
+        }
+        return;
+      }
+
+      this.applyCallResult(incident, {
+        callId: incident.voiceCall.callId,
+        status: 'completed',
+        approvalStatus: decision.approvalStatus,
+        spokenInstructions: decision.spokenInstructions,
+        confidence: 0.99,
+        durationSeconds: 15,
+        transcript: incident.voiceCall.result?.transcript || [],
+        summary: `Engineer responded via voice simulator: "${decision.spokenInstructions}".`,
+      });
+
+      if (decision.approvalStatus === 'approved') {
+        this.updateStatus(
+          incident,
+          'EXECUTING_REMEDIATION',
+          `Voice Approval Received from ${this.config.engineerName}: "${decision.spokenInstructions}". Executing approved action.`
+        );
+        await this.executeRemediation(incident);
       } else {
         this.updateStatus(
           incident,
           'ESCALATED',
-          `Voice call outcome: ${callResult.approvalStatus}. Escalating incident.`
+          `Engineer responded "${decision.approvalStatus}" ("${decision.spokenInstructions}"). Escalating to secondary on-call.`
         );
       }
 
@@ -200,13 +358,14 @@ class IncidentManager {
     const action = incident.diagnosis.recommendedAction;
     const serviceId = incident.alert.service;
     const preMetrics = clusterSimulator.getSnapshot(serviceId);
+    const executedAt = new Date().toISOString();
 
     const result = await clusterSimulator.executeRemediation(action.id, serviceId);
     const postMetrics = clusterSimulator.getSnapshot(serviceId);
 
     incident.remediation = {
       actionTaken: action,
-      executedAt: new Date().toISOString(),
+      executedAt,
       completedAt: new Date().toISOString(),
       logs: result.logs,
       success: result.success,
@@ -225,6 +384,13 @@ class IncidentManager {
       );
       incident.resolvedAt = new Date().toISOString();
       incident.postMortem = this.generatePostMortem(incident);
+
+      const signoff = `Confirmed. ${serviceId} is healthy. Latency ${postMetrics.latencyMs}ms, error rate ${postMetrics.errorRatePercent}%. Signing off.`;
+      this.appendCallTurn(incident, {
+        speaker: 'agent',
+        text: signoff,
+        timestamp: new Date().toISOString(),
+      });
       this.broadcast('incident_resolved', incident);
     } else {
       this.updateStatus(
@@ -248,52 +414,81 @@ class IncidentManager {
       throw new Error('Incident is not awaiting voice approval');
     }
 
-    const callResult: CallEResult = {
-      callId: incident.voiceCall?.callId || `sim-${Date.now()}`,
-      status: 'completed',
-      approvalStatus,
-      spokenInstructions,
-      confidence: 0.99,
-      durationSeconds: 15,
-      transcript: [
-        {
-          speaker: 'agent',
-          text: incident.diagnosis?.voicePromptScript || 'Do you approve the remediation?',
-          timestamp: new Date().toISOString(),
-        },
-        {
-          speaker: 'engineer',
-          text: spokenInstructions,
-          timestamp: new Date().toISOString(),
-        },
-      ],
-      summary: `Engineer approved action via voice simulator: "${spokenInstructions}".`,
-    };
+    this.appendCallTurn(incident, {
+      speaker: 'engineer',
+      text: spokenInstructions,
+      timestamp: new Date().toISOString(),
+    });
+    this.appendCallTurn(incident, {
+      speaker: 'agent',
+      text:
+        approvalStatus === 'approved'
+          ? `Got it. Executing ${incident.diagnosis?.recommendedAction.name || 'the fix'} now. I'll confirm when telemetry is back in band.`
+          : `Heard you. Not executing. Escalating so a human can take it.`,
+      timestamp: new Date().toISOString(),
+    });
 
-    incident.voiceCall = {
-      callId: callResult.callId,
-      phone: this.config.phoneNumber,
-      provider: 'voice_simulator',
-      status: 'completed',
-      result: callResult,
-      startedAt: incident.voiceCall?.startedAt || new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-    };
-
-    if (approvalStatus === 'approved') {
-      this.updateStatus(
-        incident,
-        'EXECUTING_REMEDIATION',
-        `Voice Simulator Approval Received: "${spokenInstructions}". Executing fix.`
-      );
-      await this.executeRemediation(incident);
-    } else {
-      this.updateStatus(
-        incident,
-        'ESCALATED',
-        `Action rejected by on-call engineer: "${spokenInstructions}". Escalated.`
-      );
+    const waiter = this.voiceWaiters.get(incidentId);
+    if (waiter) {
+      waiter.resolve({ approvalStatus, spokenInstructions });
+      return;
     }
+
+    throw new Error('Incident is not awaiting voice approval');
+  }
+
+  private cancelVoiceWait(incidentId: string) {
+    const waiter = this.voiceWaiters.get(incidentId);
+    if (!waiter) return;
+    clearTimeout(waiter.timer);
+    this.voiceWaiters.delete(incidentId);
+  }
+
+  private waitForVoiceDecision(incidentId: string, timeoutMs: number): Promise<VoiceDecision | null> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.voiceWaiters.delete(incidentId);
+        resolve(null);
+      }, timeoutMs);
+
+      this.voiceWaiters.set(incidentId, {
+        timer,
+        resolve: (decision) => {
+          clearTimeout(timer);
+          this.voiceWaiters.delete(incidentId);
+          resolve(decision);
+        },
+      });
+    });
+  }
+
+  private appendCallTurn(incident: Incident, turn: VoiceCallTurn) {
+    if (!incident.voiceCall) return;
+    if (!incident.voiceCall.result) {
+      incident.voiceCall.result = {
+        callId: incident.voiceCall.callId,
+        status: 'in_progress',
+        approvalStatus: 'unreachable',
+        confidence: 0,
+        durationSeconds: 0,
+        transcript: [],
+        summary: '',
+      };
+    }
+    incident.voiceCall.result.transcript.push(turn);
+    this.broadcast('voice_call_turn', incident, turn);
+  }
+
+  private applyCallResult(incident: Incident, callResult: CallEResult) {
+    if (!incident.voiceCall) return;
+    const existingTurns = incident.voiceCall.result?.transcript || [];
+    incident.voiceCall.result = {
+      ...callResult,
+      transcript: callResult.transcript.length > 0 ? callResult.transcript : existingTurns,
+    };
+    incident.voiceCall.status = callResult.status === 'completed' ? 'completed' : 'failed';
+    incident.voiceCall.completedAt = new Date().toISOString();
+    this.broadcast('incident_updated', incident);
   }
 
   private updateStatus(incident: Incident, status: IncidentStatus, message: string) {

@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pagerzero",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "preview_urls": true,
+  "routes": [
+    { "pattern": "pagerzero.pro", "custom_domain": true },
+    { "pattern": "www.pagerzero.pro", "custom_domain": true }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "PAGERZERO", "class_name": "PagerZeroContainer" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PagerZeroContainer"] }
+  ],
+  "vars": {
+    "PUBLIC_URL": "https://pagerzero.pro"
+  },
+  "observability": { "enabled": true }
+}

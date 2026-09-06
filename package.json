@@ -27,6 +27,7 @@
   "license": "MIT",
   "dependencies": {
     "@call-e/calle": "^0.7.0",
+    "@cloudflare/containers": "^0.3.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -42,6 +43,7 @@
     "concurrently": "^9.1.2",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
-    "vitest": "^3.0.8"
+    "vitest": "^3.0.8",
+    "wrangler": "^4.129.0"
   }
 }

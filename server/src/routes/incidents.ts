@@ -5,12 +5,50 @@ import { calleService } from '../services/calle.js';
 
 export const incidentsRouter = Router();
 
-// Get all incidents
 incidentsRouter.get('/', (req: Request, res: Response) => {
   res.json(incidentManager.getAll());
 });
 
-// Get single incident
+incidentsRouter.delete('/', (req: Request, res: Response) => {
+  const scope = req.query.scope === 'all' ? 'all' : 'resolved';
+  if (scope === 'all') {
+    clusterSimulator.resetHealthy();
+  }
+  const result = incidentManager.clearIncidents(scope);
+  res.json({
+    status: 'cleared',
+    scope,
+    ...result,
+    services: clusterSimulator.getAllServices(),
+  });
+});
+
+incidentsRouter.get('/services/health', (req: Request, res: Response) => {
+  res.json(clusterSimulator.getAllServices());
+});
+
+incidentsRouter.get('/services/:id/metrics', (req: Request, res: Response) => {
+  res.json(clusterSimulator.getServiceMetrics(req.params.id));
+});
+
+incidentsRouter.get('/config/oncall', (req: Request, res: Response) => {
+  res.json({
+    ...incidentManager.config,
+    hasCalleApiKey: calleService.hasValidApiKey(),
+  });
+});
+
+incidentsRouter.post('/config/oncall', (req: Request, res: Response) => {
+  const updated = incidentManager.updateConfig(req.body);
+  res.json(updated);
+});
+
+incidentsRouter.post('/config/calle-key', (req: Request, res: Response) => {
+  const { apiKey } = req.body;
+  calleService.setApiKey(apiKey);
+  res.json({ success: true, hasCalleApiKey: calleService.hasValidApiKey() });
+});
+
 incidentsRouter.get('/:id', (req: Request, res: Response) => {
   const inc = incidentManager.getById(req.params.id);
   if (!inc) {
@@ -20,7 +58,15 @@ incidentsRouter.get('/:id', (req: Request, res: Response) => {
   res.json(inc);
 });
 
-// Submit voice decision manually (e.g. from Web Voice Simulator)
+incidentsRouter.delete('/:id', (req: Request, res: Response) => {
+  const ok = incidentManager.deleteIncident(req.params.id);
+  if (!ok) {
+    res.status(404).json({ error: 'Incident not found' });
+    return;
+  }
+  res.json({ status: 'deleted', id: req.params.id });
+});
+
 incidentsRouter.post('/:id/voice-decision', async (req: Request, res: Response) => {
   const { decision, notes } = req.body;
   if (!decision || !['approved', 'rejected', 'escalate'].includes(decision)) {
@@ -38,33 +84,4 @@ incidentsRouter.post('/:id/voice-decision', async (req: Request, res: Response) 
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
-});
-
-// Cluster services health
-incidentsRouter.get('/services/health', (req: Request, res: Response) => {
-  res.json(clusterSimulator.getAllServices());
-});
-
-// Service metric history
-incidentsRouter.get('/services/:id/metrics', (req: Request, res: Response) => {
-  res.json(clusterSimulator.getServiceMetrics(req.params.id));
-});
-
-// Configuration
-incidentsRouter.get('/config/oncall', (req: Request, res: Response) => {
-  res.json({
-    ...incidentManager.config,
-    hasCalleApiKey: calleService.hasValidApiKey(),
-  });
-});
-
-incidentsRouter.post('/config/oncall', (req: Request, res: Response) => {
-  const updated = incidentManager.updateConfig(req.body);
-  res.json(updated);
-});
-
-incidentsRouter.post('/config/calle-key', (req: Request, res: Response) => {
-  const { apiKey } = req.body;
-  calleService.setApiKey(apiKey);
-  res.json({ success: true, hasCalleApiKey: calleService.hasValidApiKey() });
 });

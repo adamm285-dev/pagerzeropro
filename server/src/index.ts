@@ -51,7 +51,6 @@ const clients = new Set<WebSocket>();
 wss.on('connection', (ws) => {
   clients.add(ws);
 
-  // Send initial state snapshot
   ws.send(JSON.stringify({
     type: 'initial_state',
     incidents: incidentManager.getAll(),
@@ -62,9 +61,9 @@ wss.on('connection', (ws) => {
     }
   }));
 
-  ws.on('close', () => {
-    clients.delete(ws);
-  });
+  const drop = () => clients.delete(ws);
+  ws.on('close', drop);
+  ws.on('error', drop);
 });
 
 // Broadcast helper
@@ -100,7 +99,8 @@ setInterval(() => {
   }
 }, 2000);
 
-server.listen(port, () => {
-  console.log(`[PagerZero] Backend running at http://localhost:${port}`);
-  console.log(`[PagerZero] WebSocket available at ws://localhost:${port}/ws`);
+const host = process.env.HOST || '0.0.0.0';
+server.listen(Number(port), host, () => {
+  console.log(`[PagerZero] Backend running at http://${host}:${port}`);
+  console.log(`[PagerZero] WebSocket available at ws://${host}:${port}/ws`);
 });

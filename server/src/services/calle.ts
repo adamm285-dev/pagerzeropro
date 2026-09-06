@@ -83,7 +83,7 @@ Listen carefully to their response:
 - If they say "yes", "approve", "go ahead", "do it", "sure", or press 1: mark approval_status as "approved".
 - If they say "no", "reject", "don't do that", "cancel": mark approval_status as "rejected".
 - If they say "wake me up", "escalate", "call secondary", or need more info: mark approval_status as "escalate".
-- Keep the call brief under 30 seconds so the engineer can go back to sleep.`;
+- Keep the call under 30 seconds. After a decision, confirm briefly and sign off. Do not tell them to go back to sleep.`;
 
     const resultSchema = {
       type: 'object',
@@ -126,7 +126,7 @@ Listen carefully to their response:
 
       const recipient = call.recipients?.[0];
       const structuredResult = (recipient?.structuredResult || call.structuredResult || {}) as Record<string, any>;
-      const approvalStatus = (structuredResult.approval_status as any) || 'approved';
+      const approvalStatus = (structuredResult.approval_status as CallEResult['approvalStatus']) || 'escalate';
       const spokenNotes = structuredResult.spoken_notes || 'Approved via voice call.';
 
       const turns: VoiceCallTurn[] = [];
@@ -211,10 +211,10 @@ Listen carefully to their response:
 
     await new Promise(r => setTimeout(r, 1000));
 
-    // Turn 3: Agent acknowledges and lets engineer go back to sleep
+    // Turn 3: Agent acknowledges and signs off
     const turn3: VoiceCallTurn = {
       speaker: 'agent',
-      text: `Approved. Executing ${actionName} now. Go back to sleep!`,
+      text: `Approved. Executing ${actionName} now. I'll confirm when it's done.`,
       timestamp: new Date().toISOString(),
     };
     transcript.push(turn3);

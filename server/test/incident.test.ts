@@ -24,7 +24,44 @@ describe('PagerZero Core Logic', () => {
       expect(diagnosis.riskTier).toBe('TIER_1_AUTO');
       expect(diagnosis.recommendedAction.id).toBe('clean_disk_logrotate');
       expect(diagnosis.recommendedAction.risk).toBe('low');
-      expect(diagnosis.voicePromptScript).toContain('stay asleep');
+      expect(diagnosis.voicePromptScript).toContain('No action needed from you');
+    });
+
+    it('categorizes Redis memory saturation as TIER_1_AUTO flush, not auth rolling restart', () => {
+      const alert: AlertPayload = {
+        id: 'test-redis-1',
+        source: 'chaos_simulator',
+        service: 'cache-redis-03',
+        severity: 'P3',
+        title: 'Redis Node 03 Memory Above 94%',
+        description: 'Memory at 94.8%',
+        metric: 'redis_memory_percent',
+        currentValue: 94.8,
+        thresholdValue: 90,
+        timestamp: new Date().toISOString(),
+      };
+
+      const diagnosis = diagnosticsEngine.diagnose(alert, 'Adam');
+      expect(diagnosis.riskTier).toBe('TIER_1_AUTO');
+      expect(diagnosis.recommendedAction.id).toBe('flush_redis_expired_keys');
+    });
+
+    it('escalates unknown services without a runbook', () => {
+      const alert: AlertPayload = {
+        id: 'test-unknown-1',
+        source: 'datadog',
+        service: 'mystery-batch',
+        severity: 'P1',
+        title: 'Unknown failure',
+        description: 'No runbook',
+        metric: 'custom_gauge',
+        currentValue: 1,
+        thresholdValue: 0,
+        timestamp: new Date().toISOString(),
+      };
+
+      const diagnosis = diagnosticsEngine.diagnose(alert, 'Adam');
+      expect(diagnosis.riskTier).toBe('TIER_3_ESCALATE');
     });
 
     it('categorizes PostgreSQL pool exhaustion on payments-api as TIER_2_VOICE_APPROVAL', () => {
@@ -127,11 +164,25 @@ describe('PagerZero Core Logic', () => {
       };
 
       const incident = await incidentManager.handleAlert(alert);
-      
-      // Wait for diagnosis and call simulation completion (diagnostics 1s + call turns ~3.5s + remediation 1.2s + verification 1.2s)
-      await new Promise(r => setTimeout(r, 7500));
 
-      const updated = incidentManager.getById(incident.id);
+      let updated = incidentManager.getById(incident.id);
+      for (let i = 0; i < 25 && updated?.status !== 'AWAITING_VOICE_APPROVAL'; i++) {
+        await new Promise((r) => setTimeout(r, 200));
+        updated = incidentManager.getById(incident.id);
+      }
+      expect(updated?.status).toBe('AWAITING_VOICE_APPROVAL');
+
+      await incidentManager.submitVoiceDecision(
+        incident.id,
+        'approved',
+        'Yeah, I approve. Recycle the pool.'
+      );
+
+      for (let i = 0; i < 30 && updated?.status !== 'RESOLVED'; i++) {
+        await new Promise((r) => setTimeout(r, 200));
+        updated = incidentManager.getById(incident.id);
+      }
+
       expect(updated?.status).toBe('RESOLVED');
       expect(updated?.riskTier).toBe('TIER_2_VOICE_APPROVAL');
       expect(updated?.voiceCall?.status).toBe('completed');

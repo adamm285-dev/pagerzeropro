@@ -105,6 +105,11 @@ class ClusterSimulator {
     }
   }
 
+  public resetHealthy(): ServiceHealth[] {
+    this.initServices();
+    return this.getAllServices();
+  }
+
   public getAllServices(): ServiceHealth[] {
     return Array.from(this.services.values());
   }

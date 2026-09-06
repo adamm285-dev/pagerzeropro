@@ -7,7 +7,7 @@ import { IncidentCard } from './components/IncidentCard.js';
 import { LiveVoiceDrawer } from './components/LiveVoiceDrawer.js';
 import { PostMortemModal } from './components/PostMortemModal.js';
 import { SettingsModal } from './components/SettingsModal.js';
-import { PhoneCall, ShieldCheck, Activity, BedDouble } from 'lucide-react';
+import { PhoneCall, ShieldCheck, Activity, BedDouble, Trash2 } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -29,23 +29,28 @@ export const App: React.FC = () => {
 
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Initialize WebSocket connection
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
+    let disposed = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
 
     const connect = () => {
+      if (disposed) return;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        setWsConnected(true);
+        if (!disposed) setWsConnected(true);
       };
 
       ws.onclose = () => {
         setWsConnected(false);
-        // Reconnect after delay
-        setTimeout(connect, 3000);
+        if (!disposed) retry = setTimeout(connect, 3000);
+      };
+
+      ws.onerror = () => {
+        ws.close();
       };
 
       ws.onmessage = (event) => {
@@ -61,6 +66,8 @@ export const App: React.FC = () => {
     connect();
 
     return () => {
+      disposed = true;
+      if (retry) clearTimeout(retry);
       wsRef.current?.close();
     };
   }, []);
@@ -109,6 +116,19 @@ export const App: React.FC = () => {
         ]);
         setActiveVoiceIncident((current) => (current?.id === payload.incident.id ? payload.incident : current));
         break;
+
+      case 'incidents_cleared': {
+        const remaining: Incident[] = payload.data?.incidents || [];
+        const removed: string[] = payload.data?.ids || [];
+        setIncidents(remaining);
+        setActiveVoiceIncident((current) =>
+          current && removed.includes(current.id) ? null : current
+        );
+        setPostMortemIncident((current) =>
+          current && removed.includes(current.id) ? null : current
+        );
+        break;
+      }
 
       default:
         break;
@@ -176,6 +196,36 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleClearIncidents = async (scope: 'resolved' | 'all') => {
+    try {
+      const res = await fetch(`/api/incidents?scope=${scope}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (Array.isArray(data.services)) setServices(data.services);
+      setIncidents((prev) =>
+        scope === 'all'
+          ? []
+          : prev.filter((i) => i.status !== 'RESOLVED' && i.status !== 'ESCALATED')
+      );
+      if (scope === 'all') {
+        setActiveVoiceIncident(null);
+        setPostMortemIncident(null);
+      }
+    } catch (err) {
+      console.error('Failed to clear incidents:', err);
+    }
+  };
+
+  const handleDeleteIncident = async (id: string) => {
+    try {
+      await fetch(`/api/incidents/${id}`, { method: 'DELETE' });
+      setIncidents((prev) => prev.filter((i) => i.id !== id));
+      setActiveVoiceIncident((current) => (current?.id === id ? null : current));
+      setPostMortemIncident((current) => (current?.id === id ? null : current));
+    } catch (err) {
+      console.error('Failed to delete incident:', err);
+    }
+  };
+
   const handleToggleMode = async () => {
     const nextMode = config.callMode === 'calle_live' ? 'voice_simulator' : 'calle_live';
     await handleSaveConfig({ callMode: nextMode });
@@ -240,6 +290,25 @@ export const App: React.FC = () => {
                 {incidents.length} total ({activeIncidents.length} active)
               </span>
             </div>
+            {incidents.length > 0 && (
+              <div className="flex items-center gap-2">
+                {resolvedIncidents.length > 0 && (
+                  <button
+                    onClick={() => handleClearIncidents('resolved')}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                  >
+                    Clear resolved
+                  </button>
+                )}
+                <button
+                  onClick={() => handleClearIncidents('all')}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/30 transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Clear all
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Active Incidents Feed */}
@@ -255,6 +324,7 @@ export const App: React.FC = () => {
                   incident={inc}
                   onOpenVoiceDrawer={(i) => setActiveVoiceIncident(i)}
                   onOpenPostMortem={(i) => setPostMortemIncident(i)}
+                  onDismiss={handleDeleteIncident}
                 />
               ))}
             </div>
@@ -273,6 +343,7 @@ export const App: React.FC = () => {
                   incident={inc}
                   onOpenVoiceDrawer={(i) => setActiveVoiceIncident(i)}
                   onOpenPostMortem={(i) => setPostMortemIncident(i)}
+                  onDismiss={handleDeleteIncident}
                 />
               ))}
             </div>

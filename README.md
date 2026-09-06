@@ -1,47 +1,107 @@
-# 🚨 PagerZero: Autonomous Voice-Approved Incident Remediation
+# PagerZero: Zero-Wake On-Call
 
-> **"Stay in bed while your AI agent investigates, fixes, or calls for one-word approval."**  
-> 🌐 **Live Platform**: [https://pagerzero.pro](https://pagerzero.pro)  
-> 🏆 Built for the [CALL-E: Your Code Is Calling](https://call-e.devpost.com/) Hackathon.
+> Autonomous AI SRE pager replacement that **resolves routine outages silently** and secures **voice approval over the phone** for critical fixes — while engineers stay in bed.
 
-[![Domain](https://img.shields.io/badge/Live%20Domain-pagerzero.pro-10b981)](https://pagerzero.pro)
-[![CALL-E](https://img.shields.io/badge/CALL--E-SDK%20v0.7.0-emerald)](https://www.heycall-e.com/)
+🌐 **Live:** [pagerzero.pro](https://pagerzero.pro) · [Cloud Run (always-on)](https://pagerzero-309629300922.us-east1.run.app)  
+🏆 Built for the [CALL-E: Your Code Is Calling](https://call-e.devpost.com/) Hackathon  
+📄 Pitch deck: [Media/PagerZero_Autonomous_SRE.pdf](Media/PagerZero_Autonomous_SRE.pdf)
+
+[![Domain](https://img.shields.io/badge/Live-pagerzero.pro-10b981)](https://pagerzero.pro)
+[![CALL-E](https://img.shields.io/badge/CALL--E-SDK-emerald)](https://www.heycall-e.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-18.3-cyan)](https://reactjs.org/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ed)](Dockerfile)
+
+![Title](Media/deck/page-01.png)
 
 ---
 
-## 🛌 The Problem: 3 AM On-Call Burnout
+## The 3:00 AM Alert Fatigue Crisis
 
-Every software engineer and SRE dreads the 3:00 AM PagerDuty siren:
-1. You are jolted awake from deep sleep.
-2. You crawl out of bed, open your bright laptop in the dark, squint at dashboards.
-3. You run a well-known runbook command (e.g. restart a hung pod, clear a full `/var/log` buffer, recycle an exhausted database connection pool).
-4. You wait 5 minutes to verify metrics recover, close the laptop, and try to fall back asleep (ruined sleep cycle).
+![Problem](Media/deck/page-02.png)
 
-**70% to 80% of routine alerts can either be resolved autonomously or approved with a simple 10-second spoken confirmation.**
+**Status quo:** wake up → boot laptop → VPN → dashboards → one runbook command. **15–20 minutes.**  
+**80%+ of pages** are routine (log disk, stale cache, pool recycle). Waking people for those is how on-call burns out.
 
----
-
-## ⚡ The Solution: PagerZero
-
-**PagerZero** (`pagerzero.pro`) is an intelligent on-call agent and pager replacement powered by **CALL-E**:
-
-- **Autonomous SRE Reasoning**: Ingests alerts from Prometheus, Datadog, CloudWatch, or webhooks (`https://pagerzero.pro/api/alerts/webhook`), diagnoses root causes, and identifies verified runbook actions.
-- **Tier 1 (Safe Policy Auto-Remediation)**: For low-risk, idempotent runbooks (e.g. prune expired cache keys, compress full log partitions), PagerZero executes the remediation autonomously, verifies healthchecks clear, and records a post-mortem. **The on-call engineer sleeps undisturbed.**
-- **Tier 2 (CALL-E Voice Approval — Stay in Bed)**: For high-impact fixes (e.g. database connection pool recycle, cluster node scale, replica failover), PagerZero dials the engineer's mobile phone via CALL-E. The agent provides a concise 15-second voice brief:
-  > *"Hi Adam, PagerZero here. Payments API DB connection pool is 98% saturated due to 4 hung queries. I can terminate the hung queries and recycle the pool now. Do you approve?"*
-  
-  The engineer speaks into their phone half-asleep: **"Approved."**  
-  CALL-E extracts the decision as structured JSON, PagerZero executes the fix immediately, verifies telemetry recovery, and signs off: *"Action completed. Go back to sleep!"*
-- **Tier 3 (Emergency Escalation)**: If an issue is unknown, rejected, or unreachable, PagerZero triggers full emergency secondary escalation.
-- **Dual Calling Engine**: Works with live mobile phone numbers via `@call-e/calle` SDK or using the built-in browser **Interactive Voice Simulator** (synthesized speech + mic speech recognition) for instant zero-credit demonstrations.
+**PagerZero:** phone rings only when a human must consent. Speak **Approved**. Hang up.
 
 ---
 
-## 🏗️ Architecture
+## The Autonomous Escalation Funnel
+
+![Funnel](Media/deck/page-03.png)
+
+**88% fewer middle-of-the-night awakenings** (target for routine, runbook-backed alerts).
+
+| Layer | When | What happens |
+| :--- | :--- | :--- |
+| **Tier 1 — Auto-fix** | Low-risk, idempotent runbooks | Disk prune, cache flush. Telemetry verify. Post-mortem. No call. |
+| **Tier 2 — CALL-E voice gate** | High-impact (DB pool, rolling restart) | 15s phone brief. Spoken **Approved** → execute. |
+| **Tier 3 — Escalate** | Reject, timeout, unknown runbook | Secondary on-call. |
+
+---
+
+## Reasoning vs. Voice
+
+![Separation](Media/deck/page-04.png)
+
+- **SRE reasoning engine** owns telemetry, runbooks, and risk. It decides *whether* to call and *what* to ask.
+- **CALL-E** owns the phone: dial, turn-taking, structured JSON (`approval_status`). Not Twilio-style TwiML.
+
+![One spoken word](Media/deck/page-05.png)
+
+---
+
+## Execution Loop (vs 28 min human delay)
+
+![Timeline](Media/deck/page-06.png)
+
+| Step | Time | What |
+| :--- | :--- | :--- |
+| Anomaly ingested | 0.0s | Alertmanager / Datadog / chaos webhook |
+| Policy evaluation | ~1.5s | Tier 1 auto-resolves; Tier 2 plans CALL-E |
+| Spoken approval | ~6s | Engineer hears the brief, says Approved |
+| Recovery verified | ~8s | Fix runs; telemetry checked; post-mortem written |
+
+![MTTR](Media/deck/page-07.png)
+
+| Workflow | MTTR | Cognitive load | Tooling |
+| :--- | :--- | :--- | :--- |
+| Traditional pager + laptop | 28 min | High | Laptop + VPN |
+| ChatOps Slack | 14.5 min | Medium | Phone + laptop |
+| PagerZero Tier 2 (voice) | **1.2 min** | Near-zero | Cellular audio |
+| PagerZero Tier 1 (auto) | **0.15 min** | Zero | None |
+
+---
+
+## Safety Guardrails
+
+![Safety](Media/deck/page-08.png)
+
+- Pre-execution blast-radius / dependency checks  
+- Idempotent runbooks  
+- Rollback if latency/error rate does not recover  
+- Markdown post-mortem with timeline, transcript, and action IDs  
+
+![Closed loop](Media/deck/page-09.png)
+
+---
+
+## Chaos Verification Matrix
+
+![Chaos](Media/deck/page-10.png)
+
+| Scenario | Symptom | Policy | Action | Verified |
+| :--- | :--- | :--- | :--- | :--- |
+| Disk volume saturation | 96.4% on logs | Tier 1 | Logrotate / prune | 28.4% |
+| DB pool starvation | 198/200 conns | Tier 2 voice | Recycle pool | 38 conns |
+| Auth pod OOM | RSS 97% | Tier 2 voice | Rolling restart | healthy |
+| Redis memory | 94.8% | Tier 1 | Flush expired keys | ~42% |
+| Upstream 502 | error rate 42% | Tier 2 voice | Circuit breaker | queued |
+
+![Close](Media/deck/page-11.png)
+
+---
+
+## Architecture
 
 ```mermaid
 flowchart TD
@@ -50,126 +110,65 @@ flowchart TD
     end
 
     subgraph CoreAgent ["PagerZero AI SRE Core"]
-        Ingestion --> Diagnostics["Diagnostic Engine (Logs, Metrics, Runbooks)"]
-        Diagnostics --> PolicyEngine{"Policy & Risk Engine"}
-        
-        PolicyEngine -- "Tier 1: Safe & Idempotent" --> AutoFix["Autonomous Remediation Runner"]
-        PolicyEngine -- "Tier 2: Approval Required" --> VoicePlan["CALL-E Call Planner (Goal & Schema)"]
-        PolicyEngine -- "Tier 3: Unknown / Critical" --> Escalate["Loud Escalation Alert"]
+        Ingestion --> Diagnostics["Diagnostic Engine"]
+        Diagnostics --> PolicyEngine{"Policy & Risk"}
+        PolicyEngine -- "Tier 1" --> AutoFix["Autonomous Remediation"]
+        PolicyEngine -- "Tier 2" --> VoicePlan["CALL-E Call Planner"]
+        PolicyEngine -- "Tier 3" --> Escalate["Secondary On-Call"]
     end
 
     subgraph VoiceIntegration ["CALL-E Phone Bridge"]
-        VoicePlan --> CallEDialer["@call-e/calle SDK Outbound Call"]
-        VoicePlan --> WebVoiceSim["Interactive Voice Simulator (Browser Audio)"]
-        CallEDialer --> Phone["Engineer Mobile Phone (+1...)"]
-        Phone -- "Speaks 'Approve' / 'Reject'" --> CallEResult["CALL-E Structured Result"]
-        WebVoiceSim -- "Speaks / Clicks 'Approve'" --> CallEResult
+        VoicePlan --> CallEDialer["@call-e/calle outbound"]
+        VoicePlan --> WebVoiceSim["Browser voice simulator"]
+        CallEDialer --> Phone["Engineer mobile"]
+        Phone -- "Approved / Reject" --> CallEResult["Structured JSON"]
+        WebVoiceSim --> CallEResult
     end
 
-    subgraph Remediation ["Execution & Verification"]
+    subgraph Remediation ["Execution"]
         CallEResult -- "Approved" --> AutoFix
         CallEResult -- "Rejected / Timeout" --> Escalate
-        AutoFix --> ClusterRunner["Remediation Action Executor"]
-        ClusterRunner --> LiveCluster["Cluster / Infrastructure Services"]
-        LiveCluster --> MetricVerify["Metric Healthcheck & Telemetry Verification"]
-        MetricVerify --> PostMortem["Auto-Generated Markdown Post-Mortem"]
+        AutoFix --> Verify["Health verify + post-mortem"]
     end
 ```
 
 ---
 
-## 🚀 Quick Start
+## Quick start
 
-### 1. Prerequisites
-- Node.js (v18+)
-- npm (or pnpm)
-
-### 2. Installation
 ```bash
-git clone https://github.com/your-repo/PagerZero.git
-cd PagerZero
+git clone https://github.com/adamm285-dev/pagerzeropro.git
+cd pagerzeropro
 npm install
 npm --prefix client install
-```
-
-### 3. Build & Run
-```bash
-# Build server and client
 npm run build
-
-# Start the full-stack application
 npm start
 ```
-Open **[http://localhost:4000](http://localhost:4000)** in your browser!
 
-For live development with hot module reloading:
-```bash
-npm run dev
+Open [http://localhost:4000](http://localhost:4000). Dev with HMR: `npm run dev`. Tests: `npm test`.
+
+### Live CALL-E (optional)
+
+Copy `.env.example` → `.env`. Set `CALLE_API_KEY` from [dashboard.heycall-e.com](https://dashboard.heycall-e.com/account/api-keys) and `ON_CALL_PHONE` in E.164. Without a key, the **voice simulator** is used (no credits).
+
+Webhook for real monitors:
+
+```text
+POST https://pagerzero.pro/api/alerts/webhook
 ```
 
----
-
-## ⚙️ Configuration & Live CALL-E Dialing
-
-1. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-2. Configure your credentials:
-   ```env
-   CALLE_API_KEY=calle_your_api_key_here
-   CALLE_BASE_URL=https://api.heycall-e.com
-   ON_CALL_NAME=Adam (Primary SRE)
-   ON_CALL_PHONE=+15551234567
-   PORT=4000
-   ```
-3. You can also configure the API key, phone number, and toggle between **Live Call** and **Voice Simulator** directly in the UI via the **Settings (⚙️)** modal.
+Alertmanager `{ "alerts": [ ... ] }` payloads are accepted. Map `labels.service` to `payments-api`, `auth-service`, `log-ingestion-worker`, `cache-redis-03`, or `checkout-gateway`.
 
 ---
 
-## 💥 Chaos Scenarios Included
+## Deploy
 
-Test the system in real time using the built-in Chaos Outage Simulator bar:
+**Always-on (judges):** [Cloud Run](https://pagerzero-309629300922.us-east1.run.app) — `min-instances=1`.
 
-| Scenario | Service | Policy Tier | Outcome |
-| :--- | :--- | :--- | :--- |
-| **Disk 96% Full** | `log-ingestion-worker` | **Tier 1 (Auto-Fix)** | Prunes archived logs autonomously. **Engineer stays in bed.** |
-| **DB Pool Saturated** | `payments-api` | **Tier 2 (Voice Approval)** | CALL-E calls mobile phone. Engineer speaks *"Approve"*. Pool recycled. |
-| **Redis Memory Saturation** | `cache-redis-03` | **Tier 1 (Auto-Fix)** | Safely flushes expired TTL keys without waking engineer. |
-| **Auth Pod Impending OOM** | `auth-service` | **Tier 2 (Voice Approval)** | CALL-E rings for approval to perform a rolling pod restart. |
-| **Checkout Gateway 502** | `checkout-gateway` | **Tier 2 (Voice Approval)** | Rings engineer to activate circuit breaker queue fallback. |
+**Docker:** `docker compose up -d --build` (Caddy TLS if DNS points at a VM).
 
 ---
 
-## 🧪 Automated Tests
+## License
 
-Run the complete Vitest test suite covering SRE diagnostics, cluster remediation, and autonomous lifecycle:
-```bash
-npm test
-```
-
----
-
-## 🌐 Deploying to pagerzero.pro
-You can deploy PagerZero with automatic HTTPS on `pagerzero.pro` using Docker & Caddy or any container cloud:
-
-### Option A: Docker Compose + Caddy (Automatic HTTPS)
-1. Point your DNS A record for `pagerzero.pro` (and `www.pagerzero.pro`) to your server's public IP.
-2. Clone and start the containers:
-   ```bash
-   docker compose up -d --build
-   ```
-   Caddy will automatically provision a Let's Encrypt SSL certificate, route HTTPS traffic, and handle WebSockets seamlessly!
-
-### Option B: Cloud Platforms (Render, Railway, Fly.io)
-1. Connect your GitHub repository to [Render](https://render.com/), [Railway](https://railway.app/), or [Fly.io](https://fly.io/).
-2. Set environment variables:
-   - `NODE_ENV=production`
-   - `CALLE_API_KEY=...`
-   - `PUBLIC_URL=https://pagerzero.pro`
-3. Add `pagerzero.pro` in your platform's Custom Domains settings and update your DNS CNAME / A records as prompted.
-
----
-
-## 📄 License
-MIT © 2026 PagerZero Contributors.
+MIT © 2026 PagerZero.
