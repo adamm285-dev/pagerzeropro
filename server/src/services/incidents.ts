@@ -10,6 +10,7 @@ import {
 import { diagnosticsEngine } from './diagnostics.js';
 import { clusterSimulator } from './cluster.js';
 import { calleService } from './calle.js';
+import { discordNotifier } from './discord.js';
 
 type IncidentListener = (event: { type: string; incident: Incident; data?: any }) => void;
 
@@ -500,6 +501,14 @@ class IncidentManager {
       message,
     });
     this.broadcast('incident_updated', incident, { message });
+    if (
+      status === 'AWAITING_VOICE_APPROVAL' ||
+      status === 'AUTO_REMEDIATING' ||
+      status === 'RESOLVED' ||
+      status === 'ESCALATED'
+    ) {
+      discordNotifier.notifyIncident(incident, message);
+    }
   }
 
   private generatePostMortem(incident: Incident): string {

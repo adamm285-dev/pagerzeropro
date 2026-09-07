@@ -196,6 +196,21 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleSaveDiscordWebhook = async (url: string) => {
+    try {
+      const res = await fetch('/api/incidents/config/discord-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Invalid webhook');
+      setConfig((prev) => ({ ...prev, hasDiscordWebhook: Boolean(data.hasDiscordWebhook) }));
+    } catch (err) {
+      console.error('Failed to save Discord webhook:', err);
+    }
+  };
+
   const handleClearIncidents = async (scope: 'resolved' | 'all') => {
     try {
       const res = await fetch(`/api/incidents?scope=${scope}`, { method: 'DELETE' });
@@ -343,6 +358,7 @@ export const App: React.FC = () => {
         config={config}
         onSaveConfig={handleSaveConfig}
         onSaveApiKey={handleSaveApiKey}
+        onSaveDiscordWebhook={handleSaveDiscordWebhook}
       />
     </div>
   );

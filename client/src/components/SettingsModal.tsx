@@ -8,6 +8,7 @@ interface SettingsModalProps {
   config: OnCallConfig;
   onSaveConfig: (updated: Partial<OnCallConfig>) => Promise<void>;
   onSaveApiKey: (key: string) => Promise<void>;
+  onSaveDiscordWebhook: (url: string) => Promise<void>;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -16,12 +17,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   config,
   onSaveConfig,
   onSaveApiKey,
+  onSaveDiscordWebhook,
 }) => {
   const [engineerName, setEngineerName] = useState(config.engineerName);
   const [phoneNumber, setPhoneNumber] = useState(config.phoneNumber);
   const [callMode, setCallMode] = useState(config.callMode);
   const [autoApproveTier1, setAutoApproveTier1] = useState(config.autoApproveTier1);
   const [calleApiKey, setCalleApiKey] = useState('');
+  const [discordWebhook, setDiscordWebhook] = useState('');
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(config.quietHours.enabled);
   const [quietHoursStart, setQuietHoursStart] = useState(config.quietHours.start);
   const [quietHoursEnd, setQuietHoursEnd] = useState(config.quietHours.end);
@@ -62,6 +65,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
       if (calleApiKey.trim()) {
         await onSaveApiKey(calleApiKey.trim());
+      }
+      if (discordWebhook.trim()) {
+        await onSaveDiscordWebhook(discordWebhook.trim());
       }
 
       onClose();
@@ -113,6 +119,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 heycall-e.com
               </a>{' '}
               to get 20 free phone calls.
+            </p>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-phosphor mb-1 block">
+              DISCORD INCIDENT WEBHOOK
+              <span className="text-[10px] font-normal text-phosphor-dim ml-1">
+                (Optional ChatOps mirror)
+              </span>
+            </label>
+            <input
+              type="password"
+              placeholder={
+                config.hasDiscordWebhook
+                  ? '•••• webhook configured'
+                  : 'https://discord.com/api/webhooks/…'
+              }
+              value={discordWebhook}
+              onChange={(e) => setDiscordWebhook(e.target.value)}
+              className={inputClass}
+            />
+            <p className="text-[11px] text-phosphor-dim mt-1">
+              Channel → Integrations → Webhooks. Posts diagnosis, call status, and verified recovery.
             </p>
           </div>
 

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { incidentManager } from '../services/incidents.js';
 import { clusterSimulator } from '../services/cluster.js';
 import { calleService } from '../services/calle.js';
+import { discordNotifier } from '../services/discord.js';
 
 export const incidentsRouter = Router();
 
@@ -35,6 +36,7 @@ incidentsRouter.get('/config/oncall', (req: Request, res: Response) => {
   res.json({
     ...incidentManager.config,
     hasCalleApiKey: calleService.hasValidApiKey(),
+    hasDiscordWebhook: discordNotifier.hasWebhook(),
   });
 });
 
@@ -47,6 +49,16 @@ incidentsRouter.post('/config/calle-key', (req: Request, res: Response) => {
   const { apiKey } = req.body;
   calleService.setApiKey(apiKey);
   res.json({ success: true, hasCalleApiKey: calleService.hasValidApiKey() });
+});
+
+incidentsRouter.post('/config/discord-webhook', (req: Request, res: Response) => {
+  const url = typeof req.body?.url === 'string' ? req.body.url : '';
+  const ok = discordNotifier.setWebhookUrl(url);
+  if (!ok) {
+    res.status(400).json({ error: 'Invalid Discord webhook URL' });
+    return;
+  }
+  res.json({ success: true, hasDiscordWebhook: discordNotifier.hasWebhook() });
 });
 
 incidentsRouter.get('/:id', (req: Request, res: Response) => {
