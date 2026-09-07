@@ -45,7 +45,7 @@ export const IncidentCard: React.FC<IncidentCardProps> = ({
   onOpenPostMortem,
   onDismiss,
 }) => {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(incident.status !== 'RESOLVED');
   const awaitingVoice = incident.status === 'AWAITING_VOICE_APPROVAL';
   const isTier1 = incident.riskTier === 'TIER_1_AUTO';
   const statusText = STATUS_LABEL[incident.status] ?? 'FIRING';

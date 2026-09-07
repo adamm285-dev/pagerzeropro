@@ -169,23 +169,23 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
   };
 
   const statusLine = isResolved
-    ? 'Incident closed. Signing off.'
+    ? 'Closed. Signing off.'
     : isExecuting
-      ? 'Heard you. Running the approved fix and checking telemetry...'
+      ? `Executing ${actionName}…`
       : isSpeakingAgent
-        ? 'Agent speaking...'
-        : 'Listening for your voice approval...';
+        ? 'Agent speaking…'
+        : 'Say Approved — or click below.';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="w-full max-w-lg border-2 border-amber-term bg-crt-panel p-4 text-amber-term font-mono shadow-[0_0_40px_rgba(255,191,60,0.2)]">
-        <div className="text-center tracking-widest">INCOMING CALL</div>
-        <div className="mt-1 text-center text-sm text-amber-dim">
+        <div className="text-center tracking-[0.35em] text-sm animate-term-blink">INCOMING CALL</div>
+        <div className="mt-1 text-center text-sm text-amber-term-dim">
           {incident.alert.service} — {actionName}
         </div>
-        <div className="mt-2 text-center text-xs text-amber-dim">{statusLine}</div>
+        <div className="mt-2 text-center text-xs text-amber-term-dim">{statusLine}</div>
 
-        <pre className="mt-3 max-h-48 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed">
+        <pre className="mt-3 max-h-48 overflow-y-auto whitespace-pre-wrap border border-amber-term/40 bg-black/30 p-2 text-xs leading-relaxed text-phosphor">
           {transcript.length > 0
             ? transcript
                 .map((t) => `${t.speaker === 'agent' ? 'agent>' : 'you>'} ${t.text}`)
@@ -195,66 +195,60 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
         </pre>
 
         {isResolved && (
-          <div className="mt-2 text-center text-xs">Approved. Fix ran. Service recovered.</div>
-        )}
-        {isExecuting && !isResolved && (
-          <div className="mt-2 text-center text-xs text-amber-dim">
-            Heard your approval. Executing {actionName} and verifying health...
+          <div className="mt-2 text-center text-xs text-phosphor-bright">
+            Approved. Fix ran. Service recovered.
           </div>
         )}
-        {callComplete && (
-          <pre className="mt-2 overflow-x-auto text-[11px] text-amber-dim">
-{JSON.stringify(
-  {
-    approval_status: voiceCall?.result?.approvalStatus,
-    spoken_instructions: voiceCall?.result?.spokenInstructions,
-    incident_status: incident.status,
-  },
-  null,
-  2
-)}
-          </pre>
+
+        {callComplete && voiceCall?.result?.approvalStatus && voiceCall.result.approvalStatus !== 'approved' && (
+          <div className="mt-2 text-center text-xs text-red-term">
+            {voiceCall.result.approvalStatus.toUpperCase()} — fix was not run. Escalated.
+          </div>
         )}
 
         {isAwaitingApproval && (
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <button
-              disabled={submitting}
-              onClick={() => submit('approved', `Approved: Execute ${actionName}`)}
-              className="border border-amber-term px-3 py-1 hover:bg-amber-term hover:text-crt-bg disabled:opacity-60"
-            >
-              [ APPROVED ]
-            </button>
-            <button
-              disabled={submitting}
-              onClick={() => submit('rejected', 'Rejected by engineer: Will investigate manually.')}
-              className="border border-amber-term px-3 py-1 hover:bg-amber-term hover:text-crt-bg disabled:opacity-60"
-            >
-              [ REJECT ]
-            </button>
-            <button
-              disabled={submitting}
-              onClick={() => submit('escalate', 'Escalated by engineer.')}
-              className="border border-amber-term px-3 py-1 hover:bg-amber-term hover:text-crt-bg disabled:opacity-60"
-            >
-              [ ESCALATE ]
-            </button>
-            <button
-              disabled={submitting}
-              onClick={toggleListening}
-              className={`border border-amber-term px-3 py-1 hover:bg-amber-term hover:text-crt-bg disabled:opacity-60 ${
-                isListening ? 'bg-amber-term text-crt-bg' : ''
-              }`}
-            >
-              [ MIC ]
-            </button>
+          <div className="mt-4 space-y-2">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                disabled={submitting}
+                onClick={() => submit('approved', `Approved: Execute ${actionName}`)}
+                className="border-2 border-phosphor-bright px-3 py-1.5 text-phosphor-bright hover:bg-phosphor-bright hover:text-crt-bg disabled:opacity-60"
+              >
+                [ APPROVED — run fix ]
+              </button>
+              <button
+                disabled={submitting}
+                onClick={toggleListening}
+                className={`border border-amber-term px-3 py-1.5 hover:bg-amber-term hover:text-crt-bg disabled:opacity-60 ${
+                  isListening ? 'bg-amber-term text-crt-bg' : ''
+                }`}
+              >
+                {isListening ? '[ MIC ON ]' : '[ MIC ]'}
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                disabled={submitting}
+                onClick={() => submit('rejected', 'Rejected by engineer: Will investigate manually.')}
+                className="border border-red-term px-3 py-1 text-red-term hover:bg-red-term/10 disabled:opacity-60"
+              >
+                [ REJECT — skip fix ]
+              </button>
+              <button
+                disabled={submitting}
+                onClick={() => submit('escalate', 'Escalated by engineer.')}
+                className="border border-red-term px-3 py-1 text-red-term hover:bg-red-term/10 disabled:opacity-60"
+              >
+                [ ESCALATE — skip fix ]
+              </button>
+            </div>
           </div>
         )}
 
         <div className="mt-3 text-center">
           <button
             onClick={onClose}
-            className="border border-amber-term px-3 py-1 hover:bg-amber-term hover:text-crt-bg"
+            className="border border-amber-term/50 px-3 py-1 text-amber-term-dim hover:border-amber-term hover:text-amber-term"
           >
             [ ESC ]
           </button>

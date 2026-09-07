@@ -261,48 +261,27 @@ export const App: React.FC = () => {
 
   return (
     <div className="h-screen bg-crt-bg text-phosphor font-mono flex flex-col overflow-hidden min-h-0">
-      <Navbar
-        config={config}
-        services={services}
-        wsConnected={wsConnected}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onToggleMode={handleToggleMode}
-      />
+      <Navbar config={config} services={services} wsConnected={wsConnected} />
 
-      <div className="border-b border-crt-line bg-crt-bar px-3 py-2 flex flex-wrap items-center gap-2 text-xs font-mono">
+      <div className="shrink-0 border-b border-crt-line bg-crt-bar px-3 py-2 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => handleTriggerChaos('db_pool_exhaustion')}
-          className="border-2 border-amber-term text-amber-term px-3 py-1.5 hover:bg-amber-term/10 uppercase tracking-wide"
+          className="term-btn-amber"
         >
           Test voice call
         </button>
-        <button
-          type="button"
-          onClick={handleToggleMode}
-          className="border border-crt-line px-2 py-1.5 text-phosphor hover:bg-phosphor/10"
-        >
+        <button type="button" onClick={handleToggleMode} className="term-btn">
           Mode: {config.callMode === 'calle_live' ? 'LIVE CALL-E' : 'SIMULATOR'}
         </button>
-        <button
-          type="button"
-          onClick={() => setIsSettingsOpen(true)}
-          className="border border-crt-line px-2 py-1.5 text-phosphor hover:bg-phosphor/10"
-        >
+        <button type="button" onClick={() => setIsSettingsOpen(true)} className="term-btn">
           Settings
         </button>
-        <button
-          type="button"
-          onClick={() => handleClearIncidents('resolved')}
-          className="border border-crt-line px-2 py-1.5 text-phosphor-dim hover:bg-phosphor/10"
-        >
+        <span className="flex-1" />
+        <button type="button" onClick={() => handleClearIncidents('resolved')} className="term-btn text-phosphor-dim">
           Clear resolved
         </button>
-        <button
-          type="button"
-          onClick={() => handleClearIncidents('all')}
-          className="border border-red-term px-2 py-1.5 text-red-term hover:bg-red-term/10"
-        >
+        <button type="button" onClick={() => handleClearIncidents('all')} className="term-btn-danger">
           Clear all
         </button>
       </div>
@@ -315,10 +294,11 @@ export const App: React.FC = () => {
           <div className="px-2 py-1 border-b border-crt-line text-phosphor-dim text-xs">
             INCIDENTS {activeIncidents.length} active / {incidents.length} total
           </div>
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto p-1">
             {incidents.length === 0 ? (
-              <div className="p-4 text-phosphor-dim text-xs">
-                NO INCIDENTS. Use TEST VOICE CALL or a scenario above.
+              <div className="p-4 text-phosphor-dim text-xs leading-relaxed">
+                No incidents. Click <span className="text-amber-term">Test voice call</span> or a
+                FAIL/REPAIR card above.
               </div>
             ) : (
               <>

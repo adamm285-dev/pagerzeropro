@@ -80,7 +80,7 @@ export const ChaosBar: React.FC<ChaosBarProps> = ({ onTriggerChaos }) => {
               type="button"
               disabled={Boolean(loadingScenario)}
               onClick={() => handleTrigger(sc.id)}
-              className={`text-left border ${border} bg-crt-panel p-2 hover:bg-crt-bg disabled:opacity-50`}
+              className={`text-left border ${border} bg-crt-panel p-2 hover:bg-crt-bg disabled:opacity-50 focus-visible:outline focus-visible:outline-1 focus-visible:outline-phosphor`}
             >
               <div className="flex items-center justify-between gap-1 mb-1">
                 <span className={`text-[10px] tracking-widest ${accent}`}>{sc.tier}</span>

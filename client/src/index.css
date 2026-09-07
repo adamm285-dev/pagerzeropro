@@ -20,6 +20,26 @@
   animation: ring-pulse 1.8s infinite;
 }
 
+@keyframes term-blink {
+  50% { opacity: 0.35; }
+}
+
+.animate-term-blink {
+  animation: term-blink 1.1s step-end infinite;
+}
+
+@layer components {
+  .term-btn {
+    @apply border border-crt-line bg-transparent px-2 py-1.5 text-xs text-phosphor hover:bg-phosphor/10 focus-visible:outline focus-visible:outline-1 focus-visible:outline-phosphor;
+  }
+  .term-btn-amber {
+    @apply border-2 border-amber-term bg-transparent px-3 py-1.5 text-xs uppercase tracking-wide text-amber-term hover:bg-amber-term/10 focus-visible:outline focus-visible:outline-1 focus-visible:outline-amber-term;
+  }
+  .term-btn-danger {
+    @apply border border-red-term bg-transparent px-2 py-1.5 text-xs text-red-term hover:bg-red-term/10 focus-visible:outline focus-visible:outline-1 focus-visible:outline-red-term;
+  }
+}
+
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: #070905; }
 ::-webkit-scrollbar-thumb { background: #4a6a28; }

@@ -35,10 +35,11 @@ export const ServiceClusterGrid: React.FC<ServiceClusterGridProps> = ({ services
         <table className="w-full border-collapse">
           <thead>
             <tr className="text-phosphor-dim text-left">
-              <th className="px-2 py-1 font-normal border-b border-crt-line">ID</th>
+              <th className="px-2 py-1 font-normal border-b border-crt-line">SERVICE</th>
               <th className="px-2 py-1 font-normal border-b border-crt-line">METRIC</th>
               <th className="px-2 py-1 font-normal border-b border-crt-line">LAT</th>
               <th className="px-2 py-1 font-normal border-b border-crt-line">ERR</th>
+              <th className="px-2 py-1 font-normal border-b border-crt-line">POOL</th>
               <th className="px-2 py-1 font-normal border-b border-crt-line">STS</th>
             </tr>
           </thead>
@@ -47,14 +48,27 @@ export const ServiceClusterGrid: React.FC<ServiceClusterGridProps> = ({ services
               const metric = primaryMetric(s);
               const status = statusLabel(s.status);
               return (
-                <tr key={s.id} className="border-b border-crt-line/60">
-                  <td className="px-2 py-0.5 text-phosphor">{s.id}</td>
-                  <td className="px-2 py-0.5 text-phosphor">
+                <tr
+                  key={s.id}
+                  className={`border-b border-crt-line/60 ${
+                    s.status === 'critical' ? 'bg-red-term/5' : s.status === 'degraded' ? 'bg-amber-term/5' : ''
+                  }`}
+                >
+                  <td className="px-2 py-1 text-phosphor">
+                    <div>{s.name}</div>
+                    <div className="text-[10px] text-phosphor-dim">{s.id}</div>
+                  </td>
+                  <td className="px-2 py-1 text-phosphor whitespace-nowrap">
                     {metric.label} {metric.value}
                   </td>
-                  <td className="px-2 py-0.5 text-phosphor">{s.latencyMs}ms</td>
-                  <td className="px-2 py-0.5 text-phosphor">{s.errorRatePercent.toFixed(2)}%</td>
-                  <td className={`px-2 py-0.5 ${status.className}`}>{status.text}</td>
+                  <td className="px-2 py-1 text-phosphor whitespace-nowrap">{s.latencyMs}ms</td>
+                  <td className="px-2 py-1 text-phosphor whitespace-nowrap">
+                    {s.errorRatePercent.toFixed(2)}%
+                  </td>
+                  <td className="px-2 py-1 text-phosphor whitespace-nowrap">
+                    {s.activeConnections !== undefined ? s.activeConnections : '—'}
+                  </td>
+                  <td className={`px-2 py-1 ${status.className}`}>{status.text}</td>
                 </tr>
               );
             })}

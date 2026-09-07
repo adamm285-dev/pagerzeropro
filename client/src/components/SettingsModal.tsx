@@ -75,7 +75,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
-      <div className="relative w-full max-w-xl border border-crt-line bg-crt-panel font-mono text-phosphor overflow-hidden">
+      <div className="relative w-full max-w-xl max-h-[85vh] overflow-y-auto border border-crt-line bg-crt-panel font-mono text-phosphor">
         <div className="px-6 py-4 border-b border-crt-line flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Settings className="w-5 h-5 text-phosphor" />
