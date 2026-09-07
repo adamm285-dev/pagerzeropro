@@ -142,4 +142,5 @@ export interface OnCallConfig {
   };
   escalationTimeoutSeconds: number;
   shadowMode: boolean;
+  serviceGates: Record<string, 'auto' | 'voice' | 'escalate'>;
 }

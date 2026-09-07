@@ -12,6 +12,7 @@ import { diagnosticsEngine } from './diagnostics.js';
 import { clusterSimulator } from './cluster.js';
 import { calleService } from './calle.js';
 import { discordNotifier } from './discord.js';
+import { DEFAULT_SERVICE_GATES, resolveAutonomyPath } from './policy.js';
 
 type IncidentListener = (event: { type: string; incident: Incident; data?: any }) => void;
 
@@ -37,6 +38,7 @@ class IncidentManager {
     },
     escalationTimeoutSeconds: 45,
     shadowMode: process.env.SHADOW_MODE === 'true',
+    serviceGates: { ...DEFAULT_SERVICE_GATES },
   };
 
   constructor() {}
@@ -115,7 +117,11 @@ class IncidentManager {
   }
 
   public updateConfig(newConfig: Partial<OnCallConfig>) {
-    this.config = { ...this.config, ...newConfig };
+    const { serviceGates, ...rest } = newConfig;
+    this.config = { ...this.config, ...rest };
+    if (serviceGates) {
+      this.config.serviceGates = { ...this.config.serviceGates, ...serviceGates };
+    }
     return this.config;
   }
 
@@ -168,13 +174,11 @@ class IncidentManager {
 
     this.broadcast('incident_diagnosed', incident);
 
-    // Step 2: Policy Decision based on Risk Tier
-    const autoFixTier1 = diagnosis.riskTier === 'TIER_1_AUTO' && this.config.autoApproveTier1;
-    const needsVoice =
-      diagnosis.riskTier === 'TIER_2_VOICE_APPROVAL' ||
-      (diagnosis.riskTier === 'TIER_1_AUTO' && !this.config.autoApproveTier1);
+    // Step 2: Policy Decision — diagnosed tier clamped by per-service gate
+    const gate = this.config.serviceGates[incident.alert.service];
+    const path = resolveAutonomyPath(diagnosis.riskTier, gate, this.config.autoApproveTier1);
 
-    if (autoFixTier1) {
+    if (path === 'auto') {
       // PATH A: Tier 1 Auto-Remediation (Stay Asleep!)
       this.updateStatus(
         incident,
@@ -183,7 +187,7 @@ class IncidentManager {
       );
       await this.executeRemediation(incident);
 
-    } else if (needsVoice) {
+    } else if (path === 'voice') {
       const timeoutMs = Math.max(5, this.config.escalationTimeoutSeconds) * 1000;
       const decisionPromise = this.waitForVoiceDecision(incident.id, timeoutMs);
 
@@ -347,7 +351,7 @@ class IncidentManager {
       this.updateStatus(
         incident,
         'ESCALATED',
-        `Unknown root cause or severe risk. Escalating directly to high-priority alert.`
+        `Autonomy gate "${gate || 'default'}" / ${diagnosis.riskTier}: no auto-fix. Escalating to on-call.`
       );
     }
   }

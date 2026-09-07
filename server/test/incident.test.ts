@@ -178,6 +178,32 @@ describe('PagerZero Core Logic', () => {
       incidentManager.config.shadowMode = false;
     }, 10000);
 
+    it('voice gate on a Tier 1 service requires approval instead of auto-fix', async () => {
+      incidentManager.config.shadowMode = false;
+      incidentManager.config.autoApproveTier1 = true;
+      incidentManager.config.serviceGates['log-ingestion-worker'] = 'voice';
+      incidentManager.config.callMode = 'voice_simulator';
+
+      const alert: AlertPayload = {
+        id: 'gate-voice-1',
+        source: 'chaos_simulator',
+        service: 'log-ingestion-worker',
+        severity: 'P2',
+        title: 'Disk 96% full',
+        description: 'Would auto-fix without gate',
+        metric: 'disk_usage_percent',
+        currentValue: 96.4,
+        thresholdValue: 85,
+        timestamp: new Date().toISOString(),
+      };
+
+      const incident = await incidentManager.handleAlert(alert);
+      await new Promise((r) => setTimeout(r, 1500));
+      const updated = incidentManager.getById(incident.id);
+      expect(updated?.status).toBe('AWAITING_VOICE_APPROVAL');
+      incidentManager.config.serviceGates['log-ingestion-worker'] = 'auto';
+    }, 8000);
+
     it('rolls back and escalates when health worsens after a fix', async () => {
       incidentManager.config.shadowMode = false;
       clusterSimulator.failNextHealthCheck('log-ingestion-worker');

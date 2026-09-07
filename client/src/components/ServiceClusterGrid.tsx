@@ -1,8 +1,9 @@
 import React from 'react';
-import { ServiceHealth } from '../types.js';
+import { OnCallConfig, ServiceHealth } from '../types.js';
 
 interface ServiceClusterGridProps {
   services: ServiceHealth[];
+  gates: OnCallConfig['serviceGates'];
 }
 
 function primaryMetric(s: ServiceHealth): { label: string; value: string } {
@@ -25,7 +26,7 @@ function statusLabel(status: ServiceHealth['status']): { text: string; className
   return { text: 'OK', className: 'text-phosphor-bright' };
 }
 
-export const ServiceClusterGrid: React.FC<ServiceClusterGridProps> = ({ services }) => {
+export const ServiceClusterGrid: React.FC<ServiceClusterGridProps> = ({ services, gates }) => {
   return (
     <div className="border border-crt-line bg-crt-panel h-full flex flex-col overflow-hidden">
       <div className="px-2 py-1 border-b border-crt-line text-phosphor-dim text-[10px] uppercase tracking-widest">
@@ -40,6 +41,7 @@ export const ServiceClusterGrid: React.FC<ServiceClusterGridProps> = ({ services
               <th className="px-2 py-1 font-normal border-b border-crt-line">LAT</th>
               <th className="px-2 py-1 font-normal border-b border-crt-line">ERR</th>
               <th className="px-2 py-1 font-normal border-b border-crt-line">POOL</th>
+              <th className="px-2 py-1 font-normal border-b border-crt-line">GATE</th>
               <th className="px-2 py-1 font-normal border-b border-crt-line">STS</th>
             </tr>
           </thead>
@@ -67,6 +69,9 @@ export const ServiceClusterGrid: React.FC<ServiceClusterGridProps> = ({ services
                   </td>
                   <td className="px-2 py-1 text-phosphor whitespace-nowrap">
                     {s.activeConnections !== undefined ? s.activeConnections : '—'}
+                  </td>
+                  <td className="px-2 py-1 text-phosphor-dim uppercase">
+                    {gates?.[s.id] || 'auto'}
                   </td>
                   <td className={`px-2 py-1 ${status.className}`}>{status.text}</td>
                 </tr>

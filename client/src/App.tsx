@@ -20,6 +20,13 @@ export const App: React.FC = () => {
     quietHours: { enabled: true, start: '22:00', end: '07:00' },
     escalationTimeoutSeconds: 45,
     shadowMode: false,
+    serviceGates: {
+      'log-ingestion-worker': 'auto',
+      'cache-redis-03': 'auto',
+      'auth-service': 'voice',
+      'payments-api': 'voice',
+      'checkout-gateway': 'voice',
+    },
     hasCalleApiKey: false,
   });
 
@@ -305,7 +312,7 @@ export const App: React.FC = () => {
       <ChaosBar onTriggerChaos={handleTriggerChaos} />
 
       <main className="flex-1 grid md:grid-cols-2 gap-1 p-1 min-h-0">
-        <ServiceClusterGrid services={services} />
+        <ServiceClusterGrid services={services} gates={config.serviceGates} />
         <section className="border border-crt-line bg-crt-panel flex flex-col min-h-0 overflow-hidden">
           <div className="px-2 py-1 border-b border-crt-line text-phosphor-dim text-xs">
             INCIDENTS {activeIncidents.length} active / {incidents.length} total

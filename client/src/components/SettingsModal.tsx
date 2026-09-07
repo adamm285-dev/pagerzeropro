@@ -33,6 +33,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   );
   const [saving, setSaving] = useState(false);
   const [shadowMode, setShadowMode] = useState(config.shadowMode);
+  const [serviceGates, setServiceGates] = useState(config.serviceGates || {});
 
   useEffect(() => {
     setEngineerName(config.engineerName);
@@ -44,6 +45,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setQuietHoursEnd(config.quietHours.end);
     setEscalationTimeoutSeconds(config.escalationTimeoutSeconds);
     setShadowMode(Boolean(config.shadowMode));
+    setServiceGates({ ...(config.serviceGates || {}) });
   }, [config, isOpen]);
 
   if (!isOpen) return null;
@@ -64,6 +66,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         },
         escalationTimeoutSeconds,
         shadowMode,
+        serviceGates,
       });
 
       if (calleApiKey.trim()) {
@@ -273,6 +276,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </p>
               </div>
             </label>
+          </div>
+
+          <div className="pt-2 border-t border-crt-line">
+            <div className="text-xs font-bold text-phosphor mb-2">PER-SERVICE AUTONOMY GATES</div>
+            <p className="text-[11px] text-phosphor-dim mb-2">
+              AUTO = Tier 1 may self-heal. VOICE = phone approval required. ESCALATE = never auto-fix.
+              Payments and auth default to VOICE.
+            </p>
+            <div className="space-y-1">
+              {Object.keys(serviceGates).map((id) => (
+                <div key={id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="font-mono text-phosphor-dim truncate">{id}</span>
+                  <select
+                    value={serviceGates[id]}
+                    onChange={(e) =>
+                      setServiceGates((g) => ({
+                        ...g,
+                        [id]: e.target.value as 'auto' | 'voice' | 'escalate',
+                      }))
+                    }
+                    className="bg-crt-bg border border-crt-line text-phosphor px-2 py-1"
+                  >
+                    <option value="auto">AUTO</option>
+                    <option value="voice">VOICE</option>
+                    <option value="escalate">ESCALATE</option>
+                  </select>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="pt-2 border-t border-crt-line">
