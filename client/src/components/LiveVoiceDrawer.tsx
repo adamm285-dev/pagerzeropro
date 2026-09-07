@@ -6,8 +6,9 @@ interface LiveVoiceDrawerProps {
   onClose: () => void;
   onSubmitVoiceDecision: (
     incidentId: string,
-    decision: 'approved' | 'rejected' | 'escalate',
-    notes: string
+    decision: 'approved' | 'rejected' | 'escalate' | 'snooze',
+    notes: string,
+    snoozeMs?: number
   ) => Promise<void>;
   onAskQuestion: (incidentId: string, question: string) => Promise<void>;
 }
@@ -139,16 +140,18 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
   };
 
   const submit = async (
-    decision: 'approved' | 'rejected' | 'escalate',
-    notes: string
+    decision: 'approved' | 'rejected' | 'escalate' | 'snooze',
+    notes: string,
+    snoozeMs?: number
   ) => {
     if (submitting || !isAwaitingApproval) return;
     setSubmitting(true);
     try {
-      await onSubmitVoiceDecision(incident.id, decision, notes);
+      await onSubmitVoiceDecision(incident.id, decision, notes, snoozeMs);
     } catch {
       setSubmitting(false);
     }
+    if (decision === 'snooze') setSubmitting(false);
   };
 
   const handleSpokenDecision = (text: string) => {
@@ -165,18 +168,29 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
       void submit('rejected', text);
     } else if (lower.includes('escalate') || lower.includes('wake')) {
       void submit('escalate', text);
+    } else if (
+      lower.includes('snooze') ||
+      lower.includes('later') ||
+      lower.includes('call back') ||
+      lower.includes('give me') ||
+      lower.includes('not now')
+    ) {
+      void submit('snooze', text);
     } else {
       void onAskQuestion(incident.id, text);
     }
   };
 
+  const snoozing = Boolean(incident.snoozeUntil && Date.parse(incident.snoozeUntil) > Date.now());
   const statusLine = isResolved
     ? 'Closed. Signing off.'
     : isExecuting
       ? `Executing ${actionName}…`
-      : isSpeakingAgent
-        ? 'Agent speaking…'
-        : 'Ask a question, or say Approved.';
+      : snoozing
+        ? `Snoozed until ${new Date(incident.snoozeUntil!).toLocaleTimeString()}. Will redial.`
+        : isSpeakingAgent
+          ? 'Agent speaking…'
+          : 'Ask a question, say Approved, or Snooze.';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
@@ -202,7 +216,10 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
           </div>
         )}
 
-        {callComplete && voiceCall?.result?.approvalStatus && voiceCall.result.approvalStatus !== 'approved' && (
+        {callComplete &&
+          voiceCall?.result?.approvalStatus &&
+          voiceCall.result.approvalStatus !== 'approved' &&
+          voiceCall.result.approvalStatus !== 'snooze' && (
           <div className="mt-2 text-center text-xs text-red-term">
             {voiceCall.result.approvalStatus.toUpperCase()} — fix was not run. Escalated.
           </div>
@@ -259,6 +276,13 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
                 className="border border-red-term px-3 py-1 text-red-term hover:bg-red-term/10 disabled:opacity-60"
               >
                 [ ESCALATE — skip fix ]
+              </button>
+              <button
+                disabled={submitting}
+                onClick={() => submit('snooze', 'Give me 5 minutes', 5 * 60 * 1000)}
+                className="border border-amber-term px-3 py-1 text-amber-term hover:bg-amber-term/10 disabled:opacity-60"
+              >
+                [ SNOOZE 5 MIN ]
               </button>
             </div>
           </div>

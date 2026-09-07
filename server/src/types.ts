@@ -122,6 +122,8 @@ export interface Incident {
   };
 
   // Post-Mortem Report
+  snoozeUntil?: string;
+
   postMortem?: string;
   timeline: {
     timestamp: string;

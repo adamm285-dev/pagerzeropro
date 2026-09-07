@@ -173,14 +173,15 @@ export const App: React.FC = () => {
 
   const handleSubmitVoiceDecision = async (
     incidentId: string,
-    decision: 'approved' | 'rejected' | 'escalate',
-    notes: string
+    decision: 'approved' | 'rejected' | 'escalate' | 'snooze',
+    notes: string,
+    snoozeMs?: number
   ) => {
     try {
       await fetch(`/api/incidents/${incidentId}/voice-decision`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, notes }),
+        body: JSON.stringify({ decision, notes, snoozeMs }),
       });
     } catch (err) {
       console.error('Failed to submit voice decision:', err);

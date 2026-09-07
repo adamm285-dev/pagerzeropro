@@ -95,16 +95,18 @@ incidentsRouter.post('/:id/voice-question', (req: Request, res: Response) => {
 
 incidentsRouter.post('/:id/voice-decision', async (req: Request, res: Response) => {
   const { decision, notes } = req.body;
-  if (!decision || !['approved', 'rejected', 'escalate'].includes(decision)) {
-    res.status(400).json({ error: 'Invalid decision. Must be approved, rejected, or escalate' });
+  if (!decision || !['approved', 'rejected', 'escalate', 'snooze'].includes(decision)) {
+    res.status(400).json({ error: 'Invalid decision. Must be approved, rejected, escalate, or snooze' });
     return;
   }
 
   try {
+    const snoozeMs = typeof req.body?.snoozeMs === 'number' ? req.body.snoozeMs : undefined;
     await incidentManager.submitVoiceDecision(
       req.params.id,
       decision,
-      notes || (decision === 'approved' ? 'Approved via voice simulator' : 'Rejected by engineer')
+      notes || (decision === 'approved' ? 'Approved via voice simulator' : 'Rejected by engineer'),
+      snoozeMs
     );
     res.json({ status: 'ok', decision });
   } catch (err: any) {

@@ -84,6 +84,7 @@ Listen carefully to their response:
 - If they say "yes", "approve", "go ahead", "do it", "sure", or press 1: mark approval_status as "approved".
 - If they say "no", "reject", "don't do that", "cancel": mark approval_status as "rejected".
 - If they say "wake me up", "escalate", "call secondary": mark approval_status as "escalate".
+- If they say "snooze", "give me 5 minutes", "call me back", "not now": mark approval_status as "snooze". Do not escalate.
 - Keep the call under 45 seconds. After a decision, confirm briefly and sign off. Do not tell them to go back to sleep.`;
 
     const resultSchema = {

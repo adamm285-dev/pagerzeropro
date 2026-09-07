@@ -47,8 +47,11 @@ export const IncidentCard: React.FC<IncidentCardProps> = ({
 }) => {
   const [expanded, setExpanded] = useState(incident.status !== 'RESOLVED');
   const awaitingVoice = incident.status === 'AWAITING_VOICE_APPROVAL';
+  const snoozing = Boolean(incident.snoozeUntil && Date.parse(incident.snoozeUntil) > Date.now());
   const isTier1 = incident.riskTier === 'TIER_1_AUTO';
-  const statusText = STATUS_LABEL[incident.status] ?? 'FIRING';
+  const statusText = snoozing
+    ? 'SNOOZED'
+    : STATUS_LABEL[incident.status] ?? 'FIRING';
   const action = incident.diagnosis?.recommendedAction;
   const metricLine = `${incident.alert.metric} ${incident.alert.currentValue} (threshold ${incident.alert.thresholdValue})`;
 

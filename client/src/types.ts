@@ -118,6 +118,8 @@ export interface Incident {
     postMetrics?: MetricSnapshot;
   };
 
+  snoozeUntil?: string;
+
   postMortem?: string;
   timeline: {
     timestamp: string;

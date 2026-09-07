@@ -229,6 +229,44 @@ describe('PagerZero Core Logic', () => {
       expect(updated?.remediation?.logs.some((l) => l.includes('ROLLBACK'))).toBe(true);
     }, 10000);
 
+    it('snoozes without escalating and redials', async () => {
+      incidentManager.config.callMode = 'voice_simulator';
+      incidentManager.config.serviceGates['payments-api'] = 'voice';
+
+      const alert: AlertPayload = {
+        id: 'snooze-test-1',
+        source: 'chaos_simulator',
+        service: 'payments-api',
+        severity: 'P1',
+        title: 'DB Pool Saturated',
+        description: 'Hung connections',
+        metric: 'db_connection_pool_active',
+        currentValue: 198,
+        thresholdValue: 170,
+        timestamp: new Date().toISOString(),
+      };
+
+      const incident = await incidentManager.handleAlert(alert);
+      await new Promise((r) => setTimeout(r, 1500));
+      expect(incidentManager.getById(incident.id)?.status).toBe('AWAITING_VOICE_APPROVAL');
+
+      await incidentManager.submitVoiceDecision(
+        incident.id,
+        'snooze',
+        'Give me 5 minutes',
+        400
+      );
+      await new Promise((r) => setTimeout(r, 200));
+      const mid = incidentManager.getById(incident.id);
+      expect(mid?.status).toBe('AWAITING_VOICE_APPROVAL');
+      expect(mid?.snoozeUntil).toBeTruthy();
+
+      await new Promise((r) => setTimeout(r, 2500));
+      const redial = incidentManager.getById(incident.id);
+      expect(redial?.status).toBe('AWAITING_VOICE_APPROVAL');
+      expect(redial?.timeline.some((t) => t.message.includes('Redial'))).toBe(true);
+    }, 12000);
+
     it('awaits voice approval and resolves upon receiving spoken approval', async () => {
       incidentManager.config.callMode = 'voice_simulator';
 
