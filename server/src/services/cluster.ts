@@ -144,6 +144,42 @@ class ClusterSimulator {
     };
   }
 
+  private failNextHealth = new Set<string>();
+
+  public failNextHealthCheck(serviceId: string) {
+    this.failNextHealth.add(serviceId);
+  }
+
+  public restoreSnapshot(id: string, snap: MetricSnapshot) {
+    const s = this.services.get(id);
+    if (!s) return;
+    s.cpuPercent = snap.cpuPercent;
+    s.memoryPercent = snap.memoryPercent;
+    s.latencyMs = snap.latencyMs;
+    s.errorRatePercent = snap.errorRatePercent;
+    if (snap.diskUsagePercent !== undefined) s.diskUsagePercent = snap.diskUsagePercent;
+    if (snap.activeConnections !== undefined) s.activeConnections = snap.activeConnections;
+    s.status =
+      snap.errorRatePercent > 10 || snap.latencyMs > 1000 || (snap.diskUsagePercent || 0) > 90
+        ? 'critical'
+        : snap.errorRatePercent > 2
+          ? 'degraded'
+          : 'healthy';
+  }
+
+  public pollHealth(id: string): MetricSnapshot {
+    if (this.failNextHealth.has(id)) {
+      this.failNextHealth.delete(id);
+      const s = this.services.get(id);
+      if (s) {
+        s.errorRatePercent = Math.max(s.errorRatePercent, 48);
+        s.latencyMs = Math.max(s.latencyMs, 4200);
+        s.status = 'critical';
+      }
+    }
+    return this.getSnapshot(id);
+  }
+
   // Chaos triggers
   public injectFault(serviceId: string, faultType: string): ServiceHealth {
     const s = this.services.get(serviceId);

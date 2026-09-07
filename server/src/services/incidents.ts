@@ -5,7 +5,8 @@ import {
   IncidentStatus, 
   OnCallConfig, 
   VoiceCallTurn, 
-  CallEResult 
+  CallEResult,
+  MetricSnapshot
 } from '../types.js';
 import { diagnosticsEngine } from './diagnostics.js';
 import { clusterSimulator } from './cluster.js';
@@ -389,10 +390,36 @@ class IncidentManager {
         incident,
         'VERIFYING',
         shadow
-          ? 'SHADOW: skipped execution. Logging intended verify step.'
-          : 'Action executed. Verifying telemetry and error rate recovery...'
+          ? 'SHADOW: skipped execution. Logging intended health poll.'
+          : 'Action executed. Polling health for canary window...'
       );
-      await new Promise(r => setTimeout(r, shadow ? 400 : 1200));
+
+      const pollMs = Number(process.env.HEALTH_POLL_MS || 2500);
+      const worse = shadow
+        ? false
+        : await this.pollForRegression(serviceId, preMetrics, pollMs);
+
+      if (worse) {
+        clusterSimulator.restoreSnapshot(serviceId, preMetrics);
+        const rolled = clusterSimulator.getSnapshot(serviceId);
+        incident.remediation.logs.push(
+          `[ROLLBACK] Health worsened after ${action.id}. Restored pre-change snapshot.`,
+          `[ROLLBACK] ${action.rollbackPlan}`
+        );
+        incident.remediation.success = false;
+        incident.remediation.postMetrics = rolled;
+        incident.remediation.completedAt = new Date().toISOString();
+        this.updateStatus(
+          incident,
+          'ESCALATED',
+          `Canary failed. Rolled back "${action.name}" and paging secondary.`
+        );
+        return;
+      }
+
+      const verified = clusterSimulator.getSnapshot(serviceId);
+      incident.remediation.postMetrics = verified;
+      incident.remediation.completedAt = new Date().toISOString();
 
       this.updateStatus(
         incident,
@@ -404,7 +431,7 @@ class IncidentManager {
       incident.resolvedAt = new Date().toISOString();
       incident.postMortem = this.generatePostMortem(incident);
 
-      const signoff = `Confirmed. ${serviceId} is healthy. Latency ${postMetrics.latencyMs}ms, error rate ${postMetrics.errorRatePercent}%. Signing off.`;
+      const signoff = `Confirmed. ${serviceId} is healthy. Latency ${verified.latencyMs}ms, error rate ${verified.errorRatePercent}%. Signing off.`;
       this.appendCallTurn(incident, {
         speaker: 'agent',
         text: signoff,
@@ -418,6 +445,27 @@ class IncidentManager {
         `Remediation action failed. Escalating to human SRE.`
       );
     }
+  }
+
+  private metricsWorse(pre: MetricSnapshot, now: MetricSnapshot): boolean {
+    const errUp = now.errorRatePercent > pre.errorRatePercent + 2;
+    const latUp = now.latencyMs > pre.latencyMs * 1.5 + 50;
+    return errUp || latUp;
+  }
+
+  private async pollForRegression(
+    serviceId: string,
+    pre: MetricSnapshot,
+    budgetMs: number
+  ): Promise<boolean> {
+    const step = Math.max(80, Math.min(400, Math.floor(budgetMs / 5)));
+    const deadline = Date.now() + budgetMs;
+    while (Date.now() < deadline) {
+      const sample = clusterSimulator.pollHealth(serviceId);
+      if (this.metricsWorse(pre, sample)) return true;
+      await new Promise((r) => setTimeout(r, step));
+    }
+    return this.metricsWorse(pre, clusterSimulator.pollHealth(serviceId));
   }
 
   /**

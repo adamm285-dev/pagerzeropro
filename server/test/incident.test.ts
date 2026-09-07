@@ -137,18 +137,19 @@ describe('PagerZero Core Logic', () => {
       const incident = await incidentManager.handleAlert(alert);
       expect(['FIRING', 'INVESTIGATING']).toContain(incident.status);
 
-      // Wait for async processing (diagnostics 1s + remediation 1.2s + verification 1.2s)
-      await new Promise(r => setTimeout(r, 4000));
+      // diagnostics 1s + remediation 1.2s + health poll ~2.5s
+      await new Promise(r => setTimeout(r, 9000));
 
       const updated = incidentManager.getById(incident.id);
       expect(updated?.status).toBe('RESOLVED');
       expect(updated?.riskTier).toBe('TIER_1_AUTO');
       expect(updated?.remediation?.success).toBe(true);
       expect(updated?.postMortem).toContain('Autonomous Resolution');
-    }, 10000);
+    }, 15000);
 
     it('shadow mode resolves without mutating cluster health', async () => {
       incidentManager.config.shadowMode = true;
+      clusterSimulator.resetHealthy();
       clusterSimulator.injectFault('log-ingestion-worker', 'disk_full');
       const before = clusterSimulator.getService('log-ingestion-worker');
       expect(before?.diskUsagePercent).toBeGreaterThan(90);
@@ -175,6 +176,31 @@ describe('PagerZero Core Logic', () => {
       expect(updated?.remediation?.logs.some((l) => l.includes('SHADOW'))).toBe(true);
       expect(after?.diskUsagePercent).toBeGreaterThan(90);
       incidentManager.config.shadowMode = false;
+    }, 10000);
+
+    it('rolls back and escalates when health worsens after a fix', async () => {
+      incidentManager.config.shadowMode = false;
+      clusterSimulator.failNextHealthCheck('log-ingestion-worker');
+
+      const alert: AlertPayload = {
+        id: 'rollback-test-1',
+        source: 'chaos_simulator',
+        service: 'log-ingestion-worker',
+        severity: 'P2',
+        title: 'Disk 96% full',
+        description: 'Fix will fail canary',
+        metric: 'disk_usage_percent',
+        currentValue: 96.4,
+        thresholdValue: 85,
+        timestamp: new Date().toISOString(),
+      };
+
+      const incident = await incidentManager.handleAlert(alert);
+      await new Promise((r) => setTimeout(r, 7000));
+      const updated = incidentManager.getById(incident.id);
+      expect(updated?.status).toBe('ESCALATED');
+      expect(updated?.remediation?.success).toBe(false);
+      expect(updated?.remediation?.logs.some((l) => l.includes('ROLLBACK'))).toBe(true);
     }, 10000);
 
     it('awaits voice approval and resolves upon receiving spoken approval', async () => {
