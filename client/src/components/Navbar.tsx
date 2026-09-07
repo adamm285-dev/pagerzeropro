@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { OnCallConfig, ServiceHealth } from '../types.js';
 
 interface NavbarProps {
@@ -7,7 +7,29 @@ interface NavbarProps {
   wsConnected: boolean;
 }
 
+function formatClock(d: Date): string {
+  return d.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function inQuietHours(now: Date, start: string, end: string): boolean {
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  const t = now.getHours() * 60 + now.getMinutes();
+  const s = sh * 60 + sm;
+  const e = eh * 60 + em;
+  if (s === e) return true;
+  if (s < e) return t >= s && t < e;
+  return t >= s || t < e;
+}
+
 export const Navbar: React.FC<NavbarProps> = ({ config, services, wsConnected }) => {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const hasCritical = services.some((s) => s.status === 'critical');
   const hasDegraded = services.some((s) => s.status === 'degraded');
   const clusterState = hasCritical ? 'CRITICAL' : hasDegraded ? 'DEGRADED' : 'ALL OK';
@@ -16,6 +38,9 @@ export const Navbar: React.FC<NavbarProps> = ({ config, services, wsConnected })
     : hasDegraded
       ? 'text-amber-term'
       : 'text-phosphor-bright';
+  const quietNow =
+    config.quietHours.enabled &&
+    inQuietHours(now, config.quietHours.start, config.quietHours.end);
 
   return (
     <header className="h-8 shrink-0 border-b border-crt-line bg-crt-bar px-3 flex items-center justify-between text-xs font-mono text-phosphor">
@@ -28,7 +53,9 @@ export const Navbar: React.FC<NavbarProps> = ({ config, services, wsConnected })
         <span aria-hidden="true" className="text-phosphor-dim">
           ·
         </span>
-        <span>CALL-E</span>
+        <time dateTime={now.toISOString()} className="tabular-nums tracking-wider">
+          {formatClock(now)}
+        </time>
       </div>
 
       <div className="flex items-center gap-3 text-phosphor-dim">
@@ -36,8 +63,8 @@ export const Navbar: React.FC<NavbarProps> = ({ config, services, wsConnected })
           {config.engineerName}
         </span>
         {config.quietHours.enabled && (
-          <span>
-            QUIET {config.quietHours.start}–{config.quietHours.end}
+          <span className={quietNow ? 'text-phosphor-bright' : ''}>
+            {quietNow ? 'QUIET' : 'DAY'} {config.quietHours.start}–{config.quietHours.end}
           </span>
         )}
         <span className={clusterClass}>{clusterState}</span>
