@@ -43,28 +43,27 @@ export const Navbar: React.FC<NavbarProps> = ({ config, services, wsConnected })
     inQuietHours(now, config.quietHours.start, config.quietHours.end);
 
   return (
-    <header className="h-8 shrink-0 border-b border-crt-line bg-crt-bar px-3 flex items-center justify-between text-xs font-mono text-phosphor">
-      <div className="flex items-center gap-2 tracking-wide">
-        <span className="text-phosphor-bright">PAGERZERO</span>
-        <span aria-hidden="true" className="text-phosphor-dim">
-          ·
-        </span>
-        <span>TTY-1</span>
-        <span aria-hidden="true" className="text-phosphor-dim">
-          ·
-        </span>
+    <header className="shrink-0 border-b border-crt-line bg-crt-bar px-3 py-1.5 grid grid-cols-3 items-center text-xs font-mono text-phosphor">
+      <div className="flex items-center gap-2 tracking-wide justify-self-start">
+        <span className="text-phosphor-dim">TTY-1</span>
         <time dateTime={now.toISOString()} className="tabular-nums tracking-wider">
           {formatClock(now)}
         </time>
       </div>
 
-      <div className="flex items-center gap-3 text-phosphor-dim">
-        <span className="hidden sm:inline text-phosphor truncate max-w-[12rem]">
+      <div className="justify-self-center text-center leading-none select-none">
+        <pre className="text-[9px] sm:text-[10px] text-phosphor-bright whitespace-pre tracking-tight">{`╔══════════════════╗
+║  PAGERZERO PRO   ║
+╚══════════════════╝`}</pre>
+      </div>
+
+      <div className="flex items-center gap-3 text-phosphor-dim justify-self-end">
+        <span className="hidden md:inline text-phosphor truncate max-w-[10rem]">
           {config.engineerName}
         </span>
         {config.quietHours.enabled && (
           <span className={quietNow ? 'text-phosphor-bright' : ''}>
-            {quietNow ? 'QUIET' : 'DAY'} {config.quietHours.start}–{config.quietHours.end}
+            {quietNow ? 'QUIET' : 'DAY'}
           </span>
         )}
         <span className={clusterClass}>{clusterState}</span>

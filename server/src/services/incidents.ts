@@ -13,6 +13,7 @@ import { clusterSimulator } from './cluster.js';
 import { calleService } from './calle.js';
 import { discordNotifier } from './discord.js';
 import { DEFAULT_SERVICE_GATES, resolveAutonomyPath } from './policy.js';
+import { answerEngineerQuestion } from './briefing.js';
 
 type IncidentListener = (event: { type: string; incident: Incident; data?: any }) => void;
 
@@ -470,6 +471,34 @@ class IncidentManager {
       await new Promise((r) => setTimeout(r, step));
     }
     return this.metricsWorse(pre, clusterSimulator.pollHealth(serviceId));
+  }
+
+  public askVoiceQuestion(incidentId: string, question: string): { answer: string } {
+    const incident = this.incidents.get(incidentId);
+    if (!incident || incident.status !== 'AWAITING_VOICE_APPROVAL') {
+      throw new Error('Incident is not awaiting voice approval');
+    }
+    const priorQs = (incident.voiceCall?.result?.transcript || []).filter(
+      (t) => t.speaker === 'engineer'
+    ).length;
+    const live = clusterSimulator.getSnapshot(incident.alert.service);
+    const answer =
+      priorQs >= 3
+        ? `I've answered a few questions. I need Approved, Reject, or Escalate to proceed.`
+        : answerEngineerQuestion(question, incident, live);
+
+    this.appendCallTurn(incident, {
+      speaker: 'engineer',
+      text: question,
+      timestamp: new Date().toISOString(),
+    });
+    this.appendCallTurn(incident, {
+      speaker: 'agent',
+      text: answer,
+      timestamp: new Date().toISOString(),
+    });
+    this.broadcast('incident_updated', incident);
+    return { answer };
   }
 
   /**

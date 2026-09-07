@@ -79,6 +79,20 @@ incidentsRouter.delete('/:id', (req: Request, res: Response) => {
   res.json({ status: 'deleted', id: req.params.id });
 });
 
+incidentsRouter.post('/:id/voice-question', (req: Request, res: Response) => {
+  const question = typeof req.body?.question === 'string' ? req.body.question.trim() : '';
+  if (!question) {
+    res.status(400).json({ error: 'question required' });
+    return;
+  }
+  try {
+    const result = incidentManager.askVoiceQuestion(req.params.id, question);
+    res.json({ status: 'ok', ...result });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 incidentsRouter.post('/:id/voice-decision', async (req: Request, res: Response) => {
   const { decision, notes } = req.body;
   if (!decision || !['approved', 'rejected', 'escalate'].includes(decision)) {

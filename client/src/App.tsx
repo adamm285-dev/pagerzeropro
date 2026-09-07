@@ -159,6 +159,18 @@ export const App: React.FC = () => {
   };
 
   // Submit voice approval/rejection
+  const handleAskVoiceQuestion = async (incidentId: string, question: string) => {
+    try {
+      await fetch(`/api/incidents/${incidentId}/voice-question`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question }),
+      });
+    } catch (err) {
+      console.error('Failed to ask voice question:', err);
+    }
+  };
+
   const handleSubmitVoiceDecision = async (
     incidentId: string,
     decision: 'approved' | 'rejected' | 'escalate',
@@ -353,6 +365,7 @@ export const App: React.FC = () => {
         incident={activeVoiceIncident}
         onClose={() => setActiveVoiceIncident(null)}
         onSubmitVoiceDecision={handleSubmitVoiceDecision}
+        onAskQuestion={handleAskVoiceQuestion}
       />
 
       <PostMortemModal

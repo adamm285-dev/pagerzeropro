@@ -78,12 +78,13 @@ export class CalleService {
     const taskPrompt = `You are PagerZero, an autonomous SRE voice agent calling on-call engineer at ${phoneNumber}.
 Speak with a calm, clear, professional voice.
 Prompt to say: "${voiceScript}"
-Ask them: "Do you approve executing: ${actionName}?"
+Ask them: "Do you approve executing: ${actionName}? You can ask one or two questions first, like current error rate."
+If they ask a factual question about the incident, answer briefly from the briefing in the prompt, then ask for approval again.
 Listen carefully to their response:
 - If they say "yes", "approve", "go ahead", "do it", "sure", or press 1: mark approval_status as "approved".
 - If they say "no", "reject", "don't do that", "cancel": mark approval_status as "rejected".
-- If they say "wake me up", "escalate", "call secondary", or need more info: mark approval_status as "escalate".
-- Keep the call under 30 seconds. After a decision, confirm briefly and sign off. Do not tell them to go back to sleep.`;
+- If they say "wake me up", "escalate", "call secondary": mark approval_status as "escalate".
+- Keep the call under 45 seconds. After a decision, confirm briefly and sign off. Do not tell them to go back to sleep.`;
 
     const resultSchema = {
       type: 'object',

@@ -9,6 +9,7 @@ interface LiveVoiceDrawerProps {
     decision: 'approved' | 'rejected' | 'escalate',
     notes: string
   ) => Promise<void>;
+  onAskQuestion: (incidentId: string, question: string) => Promise<void>;
 }
 
 function speak(text: string, onStart?: () => void, onEnd?: () => void) {
@@ -29,6 +30,7 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
   incident,
   onClose,
   onSubmitVoiceDecision,
+  onAskQuestion,
 }) => {
   const [isListening, setIsListening] = useState(false);
   const [speechRecognized, setSpeechRecognized] = useState('');
@@ -164,7 +166,7 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
     } else if (lower.includes('escalate') || lower.includes('wake')) {
       void submit('escalate', text);
     } else {
-      setSpeechRecognized(`Unclear ("${text}"). Say approve, reject, or escalate.`);
+      void onAskQuestion(incident.id, text);
     }
   };
 
@@ -174,7 +176,7 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
       ? `Executing ${actionName}…`
       : isSpeakingAgent
         ? 'Agent speaking…'
-        : 'Say Approved — or click below.';
+        : 'Ask a question, or say Approved.';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
@@ -225,6 +227,23 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
               >
                 {isListening ? '[ MIC ON ]' : '[ MIC ]'}
               </button>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-1">
+              {[
+                'What is the error rate right now?',
+                'What is the recommended fix?',
+                'How is the disk looking?',
+              ].map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => onAskQuestion(incident.id, q)}
+                  className="border border-crt-line px-2 py-0.5 text-[10px] text-phosphor hover:bg-phosphor/10 disabled:opacity-60"
+                >
+                  {q.replace(' right now?', '?').replace('What is the ', '')}
+                </button>
+              ))}
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button
