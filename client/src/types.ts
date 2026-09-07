@@ -137,6 +137,7 @@ export interface OnCallConfig {
     end: string;
   };
   escalationTimeoutSeconds: number;
+  shadowMode: boolean;
   hasCalleApiKey?: boolean;
   hasDiscordWebhook?: boolean;
 }

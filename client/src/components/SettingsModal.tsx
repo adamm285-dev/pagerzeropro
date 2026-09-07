@@ -32,6 +32,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     config.escalationTimeoutSeconds
   );
   const [saving, setSaving] = useState(false);
+  const [shadowMode, setShadowMode] = useState(config.shadowMode);
 
   useEffect(() => {
     setEngineerName(config.engineerName);
@@ -42,6 +43,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setQuietHoursStart(config.quietHours.start);
     setQuietHoursEnd(config.quietHours.end);
     setEscalationTimeoutSeconds(config.escalationTimeoutSeconds);
+    setShadowMode(Boolean(config.shadowMode));
   }, [config, isOpen]);
 
   if (!isOpen) return null;
@@ -61,6 +63,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           end: quietHoursEnd,
         },
         escalationTimeoutSeconds,
+        shadowMode,
       });
 
       if (calleApiKey.trim()) {
@@ -252,6 +255,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onChange={(e) => setEscalationTimeoutSeconds(Number(e.target.value))}
               className={inputClass}
             />
+          </div>
+
+          <div className="pt-2 border-t border-crt-line">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={shadowMode}
+                onChange={(e) => setShadowMode(e.target.checked)}
+                className="mt-1 bg-crt-bg border-crt-line text-phosphor"
+              />
+              <div className="text-xs">
+                <span className="font-bold text-amber-term">SHADOW / DRY-RUN</span>
+                <p className="text-phosphor-dim mt-0.5">
+                  Run diagnosis, voice, and Discord as usual. Do not mutate the cluster. Use this
+                  until you trust the agent in production.
+                </p>
+              </div>
+            </label>
           </div>
 
           <div className="pt-2 border-t border-crt-line">

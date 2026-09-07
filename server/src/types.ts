@@ -141,4 +141,5 @@ export interface OnCallConfig {
     end: string;   // "07:00"
   };
   escalationTimeoutSeconds: number;
+  shadowMode: boolean;
 }

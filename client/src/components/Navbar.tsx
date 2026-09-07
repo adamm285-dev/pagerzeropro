@@ -68,6 +68,7 @@ export const Navbar: React.FC<NavbarProps> = ({ config, services, wsConnected })
           </span>
         )}
         <span className={clusterClass}>{clusterState}</span>
+        {config.shadowMode && <span className="text-amber-term tracking-widest">SHADOW</span>}
         <span className={wsConnected ? 'text-phosphor-bright' : 'text-red-term'}>
           {wsConnected ? '● LIVE' : '○ LINK'}
         </span>

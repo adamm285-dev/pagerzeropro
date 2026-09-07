@@ -19,6 +19,7 @@ export const App: React.FC = () => {
     autoApproveTier1: true,
     quietHours: { enabled: true, start: '22:00', end: '07:00' },
     escalationTimeoutSeconds: 45,
+    shadowMode: false,
     hasCalleApiKey: false,
   });
 

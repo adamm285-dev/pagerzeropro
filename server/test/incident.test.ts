@@ -147,6 +147,36 @@ describe('PagerZero Core Logic', () => {
       expect(updated?.postMortem).toContain('Autonomous Resolution');
     }, 10000);
 
+    it('shadow mode resolves without mutating cluster health', async () => {
+      incidentManager.config.shadowMode = true;
+      clusterSimulator.injectFault('log-ingestion-worker', 'disk_full');
+      const before = clusterSimulator.getService('log-ingestion-worker');
+      expect(before?.diskUsagePercent).toBeGreaterThan(90);
+
+      const alert: AlertPayload = {
+        id: 'shadow-test-1',
+        source: 'chaos_simulator',
+        service: 'log-ingestion-worker',
+        severity: 'P2',
+        title: 'Disk 96% full',
+        description: 'Shadow dry-run',
+        metric: 'disk_usage_percent',
+        currentValue: 96.4,
+        thresholdValue: 85,
+        timestamp: new Date().toISOString(),
+      };
+
+      const incident = await incidentManager.handleAlert(alert);
+      await new Promise((r) => setTimeout(r, 2500));
+      const updated = incidentManager.getById(incident.id);
+      const after = clusterSimulator.getService('log-ingestion-worker');
+
+      expect(updated?.status).toBe('RESOLVED');
+      expect(updated?.remediation?.logs.some((l) => l.includes('SHADOW'))).toBe(true);
+      expect(after?.diskUsagePercent).toBeGreaterThan(90);
+      incidentManager.config.shadowMode = false;
+    }, 10000);
+
     it('awaits voice approval and resolves upon receiving spoken approval', async () => {
       incidentManager.config.callMode = 'voice_simulator';
 

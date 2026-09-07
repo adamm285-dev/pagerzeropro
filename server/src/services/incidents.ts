@@ -35,6 +35,7 @@ class IncidentManager {
       end: '07:00',
     },
     escalationTimeoutSeconds: 45,
+    shadowMode: process.env.SHADOW_MODE === 'true',
   };
 
   constructor() {}
@@ -360,8 +361,17 @@ class IncidentManager {
     const serviceId = incident.alert.service;
     const preMetrics = clusterSimulator.getSnapshot(serviceId);
     const executedAt = new Date().toISOString();
+    const shadow = this.config.shadowMode;
 
-    const result = await clusterSimulator.executeRemediation(action.id, serviceId);
+    const result = shadow
+      ? {
+          success: true,
+          logs: [
+            `[SHADOW] Would execute ${action.id} on ${serviceId}: ${action.command}`,
+            '[SHADOW] Cluster left unchanged. No production mutation.',
+          ],
+        }
+      : await clusterSimulator.executeRemediation(action.id, serviceId);
     const postMetrics = clusterSimulator.getSnapshot(serviceId);
 
     incident.remediation = {
@@ -375,13 +385,21 @@ class IncidentManager {
     };
 
     if (result.success) {
-      this.updateStatus(incident, 'VERIFYING', 'Action executed. Verifying telemetry and error rate recovery...');
-      await new Promise(r => setTimeout(r, 1200));
+      this.updateStatus(
+        incident,
+        'VERIFYING',
+        shadow
+          ? 'SHADOW: skipped execution. Logging intended verify step.'
+          : 'Action executed. Verifying telemetry and error rate recovery...'
+      );
+      await new Promise(r => setTimeout(r, shadow ? 400 : 1200));
 
       this.updateStatus(
         incident,
         'RESOLVED',
-        `Telemetry verified healthy. Service recovered. Incident automatically closed.`
+        shadow
+          ? `SHADOW: would have run "${action.name}". Cluster unchanged.`
+          : `Telemetry verified healthy. Service recovered. Incident automatically closed.`
       );
       incident.resolvedAt = new Date().toISOString();
       incident.postMortem = this.generatePostMortem(incident);
