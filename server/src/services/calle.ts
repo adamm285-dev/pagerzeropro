@@ -107,7 +107,7 @@ State the incident: "${voiceScript}"
 Ask: "Do you approve executing the remediation runbook: ${actionName}?"
 If they ask a factual question about the incident, answer briefly from the briefing, then ask for approval again.
 Listen carefully to the engineer:
-- If they say "approved", "approve", "yes", "confirm", "go ahead", or "do it": thank them, confirm that their approval is recorded and the remediation runbook will be executed, and end the call. Record approval_status as "approved".
+- If they say "approved", "approve", "yes", "confirm", "go ahead", or "do it": thank them, confirm that their approval is recorded, state clearly that PagerZero is executing ${actionName} right now and actively monitoring cluster recovery, tell ${engineerName} they are all set and can head back to sleep, and end the call. Record approval_status as "approved".
 - If they say "reject", "no", "cancel", "don't do that": confirm the incident will be escalated, and end the call. Record approval_status as "rejected".
 - If they say "wake me up", "escalate", "call secondary": confirm escalating to secondary on-call, and end the call. Record approval_status as "escalate".
 - If they say "snooze", "give me 5 minutes", "call me back", "not now": confirm snoozing for 5 minutes, and end the call. Record approval_status as "snooze".
