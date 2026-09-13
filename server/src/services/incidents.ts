@@ -233,7 +233,10 @@ class IncidentManager {
 
   private async conductVoiceLoop(incident: Incident, diagnosis: DiagnosisResult) {
     for (let attempt = 0; attempt < 6; attempt++) {
-      const timeoutMs = Math.max(5, this.config.escalationTimeoutSeconds) * 1000;
+      const liveMode = this.config.callMode === 'calle_live' && calleService.hasValidApiKey();
+      const timeoutMs = liveMode
+        ? Math.max(120, this.config.escalationTimeoutSeconds * 2) * 1000
+        : Math.max(5, this.config.escalationTimeoutSeconds) * 1000;
       const decisionPromise = this.waitForVoiceDecision(incident.id, timeoutMs);
 
       this.updateStatus(
@@ -246,8 +249,6 @@ class IncidentManager {
 
       this.startVoiceAttempt(incident);
       incident.snoozeUntil = undefined;
-
-      const liveMode = this.config.callMode === 'calle_live' && calleService.hasValidApiKey();
       let outcome: VoiceDecision | null = null;
 
       if (liveMode) {
@@ -265,10 +266,18 @@ class IncidentManager {
           },
           (turn: VoiceCallTurn) => this.appendCallTurn(incident, turn)
         );
-        const winner = await Promise.race([
+        let winner = await Promise.race([
           decisionPromise.then((d) => ({ kind: 'dashboard' as const, decision: d })),
           callPromise.then((c) => ({ kind: 'calle' as const, call: c })),
         ]);
+
+        // If dashboard wait expired without user interaction, wait for active phone call
+        if (winner.kind === 'dashboard' && winner.decision === null) {
+          console.log('[INCIDENT] Dashboard wait timer expired, awaiting active CALL-E phone call completion...');
+          const call = await callPromise;
+          winner = { kind: 'calle', call };
+        }
+
         if (winner.kind === 'dashboard') {
           outcome = winner.decision;
           if (outcome) {

@@ -90,26 +90,17 @@ export class CalleService {
       throw new Error('CALL-E API client is not configured.');
     }
 
-    const pinInstruction = requirePin
-      ? `Ask them: "Do you approve executing: ${actionName}? For security verification, please say Approved followed by your 4-digit security PIN ${securityPin}."
-If they ask a factual question about the incident, answer briefly from the briefing in the prompt, then ask for approval and the security PIN again.
-Listen carefully to their response:
-- If they say "yes", "approve", "go ahead", "do it", "sure", or "approved" AND state the security PIN (${securityPin}): mark approval_status as "approved", pin_verified as true, and spoken_pin as "${securityPin}".
-- If they say approve or yes but do NOT state the security PIN, or state a different PIN: politely ask once: "Please state your 4-digit security PIN to authorize this remediation." If they provide ${securityPin}, mark approval_status as "approved", pin_verified as true, and spoken_pin as "${securityPin}". If they give an incorrect PIN or refuse, mark approval_status as "rejected", pin_verified as false, and spoken_pin with what they said.
-- If they say "no", "reject", "don't do that", "cancel": mark approval_status as "rejected", pin_verified as false.`
-      : `Ask them: "Do you approve executing: ${actionName}? You can ask one or two questions first, like current error rate."
-If they ask a factual question about the incident, answer briefly from the briefing in the prompt, then ask for approval again.
-Listen carefully to their response:
-- If they say "yes", "approve", "go ahead", "do it", "sure", or press 1: mark approval_status as "approved", pin_verified as true.
-- If they say "no", "reject", "don't do that", "cancel": mark approval_status as "rejected", pin_verified as false.`;
-
-    const taskPrompt = `You are PagerZero, an autonomous SRE voice agent calling on-call engineer at ${phoneNumber}.
+    const taskPrompt = `You are PagerZero, an automated SRE incident response system calling on-call engineer at ${phoneNumber}.
 Speak with a calm, clear, professional voice.
-Prompt to say: "${voiceScript}"
-${pinInstruction}
-- If they say "wake me up", "escalate", "call secondary": mark approval_status as "escalate", pin_verified as false.
-- If they say "snooze", "give me 5 minutes", "call me back", "not now": mark approval_status as "snooze", pin_verified as false. Do not escalate.
-- Keep the call under 45 seconds. After a decision, confirm briefly and sign off. Do not tell them to go back to sleep.`;
+Incident briefing to state: "${voiceScript}"
+Ask them: "Do you approve executing the remediation runbook: ${actionName}? Say Approved to authorize or Reject to cancel."
+If they ask a factual question about the incident, answer briefly from the briefing, then ask for approval again.
+Listen carefully to their response:
+- If they say "yes", "approve", "go ahead", "do it", "sure", or "approved": mark approval_status as "approved" and record their exact spoken words in spoken_notes.
+- If they say "no", "reject", "don't do that", "cancel": mark approval_status as "rejected" and record in spoken_notes.
+- If they say "wake me up", "escalate", "call secondary": mark approval_status as "escalate" and record in spoken_notes.
+- If they say "snooze", "give me 5 minutes", "call me back", "not now": mark approval_status as "snooze" and record in spoken_notes.
+Keep the call under 45 seconds. Confirm their decision and sign off immediately.`;
 
     const resultSchema = {
       type: 'object',
@@ -118,14 +109,6 @@ ${pinInstruction}
           type: 'string',
           enum: ['approved', 'rejected', 'escalate', 'snooze', 'unreachable'],
           description: 'Approval status decision from engineer.'
-        },
-        pin_verified: {
-          type: 'boolean',
-          description: 'Whether the engineer provided the correct 4-digit security PIN.'
-        },
-        spoken_pin: {
-          type: 'string',
-          description: 'The security PIN spoken by the engineer.'
         },
         spoken_notes: {
           type: 'string',
@@ -147,17 +130,35 @@ ${pinInstruction}
         timestamp: new Date().toISOString(),
       });
 
-      const initialCall = await this.client.calls.create({
-        task: taskPrompt,
-        recipients: [
-          {
-            phones: [phoneNumber],
-            region: 'US',
-            locale: 'en-US'
+      let initialCall: any;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          initialCall = await this.client.calls.create({
+            task: taskPrompt,
+            recipients: [
+              {
+                phones: [phoneNumber],
+                region: 'US',
+                locale: 'en-US'
+              }
+            ],
+            resultSchema,
+          });
+          break;
+        } catch (createErr: any) {
+          if (createErr?.status === 429 && attempt < 3) {
+            console.warn(`[CALL-E] Shared line busy (429 concurrency limit). Waiting 5s before retry ${attempt + 1}...`);
+            onProgress?.({
+              speaker: 'agent',
+              text: `[CALL-E] Line busy, retrying outbound dial in 5s (attempt ${attempt + 1}/3)...`,
+              timestamp: new Date().toISOString(),
+            });
+            await new Promise((r) => setTimeout(r, 5000));
+            continue;
           }
-        ],
-        resultSchema,
-      });
+          throw createErr;
+        }
+      }
 
       console.log(`[CALL-E] Call created with ID: ${initialCall.id}. Awaiting telephony response...`);
       onProgress?.({
@@ -202,13 +203,13 @@ ${pinInstruction}
       }
 
       const recipient = finalCall.recipients?.[0];
+      const attemptInfo = recipient?.attempts?.[0];
       const structuredResult = (recipient?.structuredResult || finalCall.structuredResult || {}) as Record<string, any>;
-      const approvalStatus = (structuredResult.approval_status as CallEResult['approvalStatus']) || 'escalate';
-      const spokenNotes = structuredResult.spoken_notes || 'Approved via voice call.';
+      const callSummary = attemptInfo?.summary || recipient?.summary || finalCall.summary || '';
 
       const turns: VoiceCallTurn[] = [];
-      if (recipient?.attempts?.[0]?.transcriptTurns && recipient.attempts[0].transcriptTurns.length > 0) {
-        for (const t of recipient.attempts[0].transcriptTurns) {
+      if (attemptInfo?.transcriptTurns && attemptInfo.transcriptTurns.length > 0) {
+        for (const t of attemptInfo.transcriptTurns) {
           turns.push({
             speaker: t.speaker === 'bot' ? 'agent' : 'engineer',
             text: t.text,
@@ -221,42 +222,69 @@ ${pinInstruction}
           text: voiceScript,
           timestamp: new Date().toISOString(),
         });
-        turns.push({
-          speaker: 'engineer',
-          text: spokenNotes,
-          timestamp: new Date().toISOString(),
-        });
       }
 
-      // Determine PIN verification status
-      const spokenWords = turns
+      // Collect user turns and spoken notes
+      const userSpokenWords = turns
         .filter((t) => t.speaker === 'engineer')
         .map((t) => t.text)
         .join(' ');
-      const transcriptIncludesPin = 
-        spokenWords.includes(securityPin) || 
-        spokenNotes.includes(securityPin) ||
-        extractSpokenPin(spokenWords) === securityPin ||
-        extractSpokenPin(spokenNotes) === securityPin;
+      const combinedSpoken = `${userSpokenWords} ${structuredResult.spoken_notes || ''}`.trim();
+      const spokenNotes = combinedSpoken || structuredResult.spoken_notes || 'Approved via voice call.';
 
-      const pinVerified = !requirePin || 
-        structuredResult.pin_verified === true ||
-        (structuredResult.spoken_pin && String(structuredResult.spoken_pin).replace(/\D/g, '') === securityPin) ||
-        transcriptIncludesPin;
+      // Determine approval status from structuredResult or summary or transcript
+      let rawApproval: CallEResult['approvalStatus'] = (structuredResult.approval_status as CallEResult['approvalStatus']);
+      if (!rawApproval || rawApproval === 'unreachable') {
+        const lowerSummary = callSummary.toLowerCase();
+        const lowerSpoken = combinedSpoken.toLowerCase();
+        if (lowerSummary.includes('approved') || lowerSpoken.includes('approve') || lowerSpoken.includes('yes')) {
+          rawApproval = 'approved';
+        } else if (lowerSummary.includes('reject') || lowerSpoken.includes('reject') || lowerSpoken.includes('no')) {
+          rawApproval = 'rejected';
+        } else if (lowerSummary.includes('snooze') || lowerSpoken.includes('snooze')) {
+          rawApproval = 'snooze';
+        } else if (lowerSummary.includes('escalat') || lowerSpoken.includes('escalat')) {
+          rawApproval = 'escalate';
+        } else {
+          rawApproval = 'escalate';
+        }
+      }
 
-      const spokenPin = structuredResult.spoken_pin || (pinVerified ? securityPin : undefined);
+      // Determine PIN verification status
+      const extractedPin = extractSpokenPin(`${combinedSpoken} ${callSummary}`);
+      const isPinMatch = extractedPin === securityPin;
+
+      let pinVerified = false;
+      let finalApprovalStatus = rawApproval;
+
+      if (requirePin) {
+        if (rawApproval === 'approved') {
+          if (isPinMatch) {
+            pinVerified = true;
+            finalApprovalStatus = 'approved';
+          } else {
+            console.warn(`[CALL-E] Approval spoken but PIN invalid. Spoken: "${combinedSpoken}", Expected: "${securityPin}"`);
+            pinVerified = false;
+            finalApprovalStatus = 'escalate';
+          }
+        }
+      } else {
+        pinVerified = true;
+      }
+
+      const spokenPin = isPinMatch ? securityPin : (extractedPin || undefined);
 
       return {
         callId: finalCall.id,
         status: finalCall.status === 'completed' ? 'completed' : 'failed',
-        approvalStatus: approvalStatus,
+        approvalStatus: finalApprovalStatus,
         spokenInstructions: spokenNotes,
         pinVerified: pinVerified,
         spokenPin: spokenPin,
         confidence: structuredResult.confidence || 0.95,
         durationSeconds: 22,
         transcript: turns,
-        summary: finalCall.summary || `Engineer responded "${spokenNotes}" with status: ${approvalStatus} (PIN ${pinVerified ? 'verified' : 'unverified'}).`,
+        summary: callSummary || `Engineer responded "${spokenNotes}" with status: ${finalApprovalStatus} (PIN ${pinVerified ? 'verified' : 'unverified'}).`,
       };
     } catch (err: any) {
       console.error('[CALL-E] Real call error:', err);
