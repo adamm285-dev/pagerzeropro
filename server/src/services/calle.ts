@@ -299,6 +299,19 @@ Record their exact spoken words in spoken_notes.`;
       };
     } catch (err: any) {
       console.error('[CALL-E] Real call error:', err);
+      if (
+        err?.status === 402 ||
+        String(err?.message || '').includes('balance') ||
+        String(err?.details?.reason_code || '').includes('balance')
+      ) {
+        console.warn('[CALL-E] Balance exhausted (402). Falling back to voice simulation mode...');
+        onProgress?.({
+          speaker: 'agent',
+          text: `⚠️ [CALL-E Balance Exhausted] Switching to in-browser voice simulation...`,
+          timestamp: new Date().toISOString(),
+        });
+        return this.simulateCall(engineerName, voiceScript, actionName, securityPin, requirePin, onProgress);
+      }
       // Fallback gracefully with clear message
       return {
         callId: `calle-err-${Date.now()}`,
