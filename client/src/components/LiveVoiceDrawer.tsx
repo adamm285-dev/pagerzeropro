@@ -24,6 +24,19 @@ function speak(text: string, onStart?: () => void, onEnd?: () => void) {
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.rate = 1.05;
+  const voices = window.speechSynthesis.getVoices();
+  const maleVoice = voices.find(v =>
+    v.lang.startsWith('en') && (
+      v.name.toLowerCase().includes('male') ||
+      v.name.toLowerCase().includes('david') ||
+      v.name.toLowerCase().includes('mark') ||
+      v.name.toLowerCase().includes('guy') ||
+      v.name.toLowerCase().includes('george')
+    )
+  );
+  if (maleVoice) {
+    utterance.voice = maleVoice;
+  }
   utterance.onstart = () => onStart?.();
   utterance.onend = () => onEnd?.();
   utterance.onerror = () => onEnd?.();

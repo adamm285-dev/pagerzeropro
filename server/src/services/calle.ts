@@ -102,8 +102,8 @@ export class CalleService {
       throw new Error('CALL-E API client is not configured.');
     }
 
-    const taskPrompt = `You are PagerZero, an automated SRE incident response system calling on-call engineer ${engineerName} at ${phoneNumber}.
-Speak with a calm, clear, professional voice.
+    const taskPrompt = `You are Alex, an automated SRE incident response system with PagerZero calling on-call engineer ${engineerName} at ${phoneNumber}.
+You are a male engineer. Speak with a deep, calm, confident, and professional male voice.
 Incident briefing to state: "${voiceScript}"
 Ask the engineer: "Do you approve executing the remediation runbook: ${actionName}? Say Approved to authorize or Reject to cancel."
 If they ask a factual question about the incident, answer briefly from the briefing, then ask for approval again.
