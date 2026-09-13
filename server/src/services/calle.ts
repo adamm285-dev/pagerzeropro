@@ -102,26 +102,16 @@ export class CalleService {
       throw new Error('CALL-E API client is not configured.');
     }
 
-    const taskPrompt = `You are Alex, an automated SRE incident response system with PagerZero calling on-call engineer ${engineerName} at ${phoneNumber}.
-You are a male engineer. Speak with a deep, calm, confident, and professional male voice.
-Incident briefing to state: "${voiceScript}"
-Ask the engineer: "Do you approve executing the remediation runbook: ${actionName}? Say Approved to authorize or Reject to cancel."
+    const taskPrompt = `You are PagerZero, an automated SRE incident response system calling on-call engineer ${engineerName} regarding an urgent service incident at ${phoneNumber}.
+State the incident: "${voiceScript}"
+Ask: "Do you approve executing the remediation runbook: ${actionName}?"
 If they ask a factual question about the incident, answer briefly from the briefing, then ask for approval again.
-Listen carefully to their response:
-- If they say "yes", "approve", "go ahead", "do it", "sure", or "approved":
-  1. Acknowledge immediately: "Approval confirmed, ${engineerName}. Executing ${actionName} now. Hold on one moment while I verify cluster health..."
-  2. Wait a brief 3-second moment.
-  3. Report the verified cluster recovery: "Telemetry check complete: ${actionName} executed successfully, active connections and error rates dropped to normal, and all services are healthy in the green. You can head back to sleep, ${engineerName}. Good night!"
-  4. Mark approval_status as "approved", record their exact spoken words in spoken_notes, and sign off.
-- If they say "no", "reject", "don't do that", "cancel":
-  Acknowledge: "Understood, remediation canceled. Alert will be escalated."
-  Mark approval_status as "rejected", record in spoken_notes, and sign off.
-- If they say "wake me up", "escalate", "call secondary":
-  Acknowledge: "Understood, escalating to secondary on-call."
-  Mark approval_status as "escalate", record in spoken_notes, and sign off.
-- If they say "snooze", "give me 5 minutes", "call me back", "not now":
-  Acknowledge: "Snoozing alert for 5 minutes. I will call you back shortly."
-  Mark approval_status as "snooze", record in spoken_notes, and sign off.`;
+Listen carefully to the engineer:
+- If they say "approved", "approve", "yes", "confirm", "go ahead", or "do it": thank them, confirm that their approval is recorded and the remediation runbook will be executed, and end the call. Record approval_status as "approved".
+- If they say "reject", "no", "cancel", "don't do that": confirm the incident will be escalated, and end the call. Record approval_status as "rejected".
+- If they say "wake me up", "escalate", "call secondary": confirm escalating to secondary on-call, and end the call. Record approval_status as "escalate".
+- If they say "snooze", "give me 5 minutes", "call me back", "not now": confirm snoozing for 5 minutes, and end the call. Record approval_status as "snooze".
+Record their exact spoken words in spoken_notes.`;
 
     const resultSchema = {
       type: 'object',
