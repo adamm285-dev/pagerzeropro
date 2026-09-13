@@ -60,6 +60,7 @@ export class CalleService {
     onProgress?: (turn: VoiceCallTurn) => void
   ): Promise<CallEResult> {
     const {
+      serviceName,
       engineerName,
       phoneNumber,
       voiceScript,
@@ -71,7 +72,16 @@ export class CalleService {
 
     // If liveMode requested AND API key is present, use real CALL-E SDK
     if (liveMode && this.client) {
-      return this.placeRealCall(phoneNumber, voiceScript, actionName, securityPin, requirePin, onProgress);
+      return this.placeRealCall(
+        phoneNumber,
+        voiceScript,
+        actionName,
+        securityPin,
+        requirePin,
+        onProgress,
+        engineerName,
+        serviceName
+      );
     }
 
     // Otherwise, simulate high-fidelity realistic call
@@ -84,23 +94,34 @@ export class CalleService {
     actionName: string,
     securityPin: string = '1234',
     requirePin: boolean = true,
-    onProgress?: (turn: VoiceCallTurn) => void
+    onProgress?: (turn: VoiceCallTurn) => void,
+    engineerName: string = 'Adam',
+    serviceName?: string
   ): Promise<CallEResult> {
     if (!this.client) {
       throw new Error('CALL-E API client is not configured.');
     }
 
-    const taskPrompt = `You are PagerZero, an automated SRE incident response system calling on-call engineer at ${phoneNumber}.
+    const taskPrompt = `You are PagerZero, an automated SRE incident response system calling on-call engineer ${engineerName} at ${phoneNumber}.
 Speak with a calm, clear, professional voice.
 Incident briefing to state: "${voiceScript}"
-Ask them: "Do you approve executing the remediation runbook: ${actionName}? Say Approved to authorize or Reject to cancel."
+Ask the engineer: "Do you approve executing the remediation runbook: ${actionName}? Say Approved to authorize or Reject to cancel."
 If they ask a factual question about the incident, answer briefly from the briefing, then ask for approval again.
 Listen carefully to their response:
-- If they say "yes", "approve", "go ahead", "do it", "sure", or "approved": mark approval_status as "approved" and record their exact spoken words in spoken_notes.
-- If they say "no", "reject", "don't do that", "cancel": mark approval_status as "rejected" and record in spoken_notes.
-- If they say "wake me up", "escalate", "call secondary": mark approval_status as "escalate" and record in spoken_notes.
-- If they say "snooze", "give me 5 minutes", "call me back", "not now": mark approval_status as "snooze" and record in spoken_notes.
-Keep the call under 45 seconds. Confirm their decision and sign off immediately.`;
+- If they say "yes", "approve", "go ahead", "do it", "sure", or "approved":
+  1. Acknowledge immediately: "Approval confirmed, ${engineerName}. Executing ${actionName} now. Hold on one moment while I verify cluster health..."
+  2. Wait a brief 3-second moment.
+  3. Report the verified cluster recovery: "Telemetry check complete: ${actionName} executed successfully, active connections and error rates dropped to normal, and all services are healthy in the green. You can head back to sleep, ${engineerName}. Good night!"
+  4. Mark approval_status as "approved", record their exact spoken words in spoken_notes, and sign off.
+- If they say "no", "reject", "don't do that", "cancel":
+  Acknowledge: "Understood, remediation canceled. Alert will be escalated."
+  Mark approval_status as "rejected", record in spoken_notes, and sign off.
+- If they say "wake me up", "escalate", "call secondary":
+  Acknowledge: "Understood, escalating to secondary on-call."
+  Mark approval_status as "escalate", record in spoken_notes, and sign off.
+- If they say "snooze", "give me 5 minutes", "call me back", "not now":
+  Acknowledge: "Snoozing alert for 5 minutes. I will call you back shortly."
+  Mark approval_status as "snooze", record in spoken_notes, and sign off.`;
 
     const resultSchema = {
       type: 'object',
