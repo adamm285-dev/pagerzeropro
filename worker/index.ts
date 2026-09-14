@@ -9,6 +9,13 @@ export default {
   async fetch(request: Request): Promise<Response> {
     const incoming = new URL(request.url);
     const origin = new URL(incoming.pathname + incoming.search, ORIGIN);
+
+    // Forward WebSocket connections cleanly
+    const upgradeHeader = request.headers.get("Upgrade");
+    if (upgradeHeader && upgradeHeader.toLowerCase() === "websocket") {
+      return fetch(origin.toString(), request);
+    }
+
     return fetch(
       new Request(origin.toString(), {
         method: request.method,

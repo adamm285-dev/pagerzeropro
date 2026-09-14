@@ -28,6 +28,8 @@ export const App: React.FC = () => {
       'checkout-gateway': 'voice',
     },
     hasCalleApiKey: false,
+    securityPin: '1234',
+    requirePin: true,
   });
 
   const [activeVoiceIncident, setActiveVoiceIncident] = useState<Incident | null>(null);
@@ -86,6 +88,12 @@ export const App: React.FC = () => {
         setIncidents(payload.incidents || []);
         setServices(payload.services || []);
         if (payload.config) setConfig(payload.config);
+        break;
+
+      case 'config_updated':
+        if (payload.data?.config) {
+          setConfig((prev) => ({ ...prev, ...payload.data.config }));
+        }
         break;
 
       case 'telemetry_tick':
@@ -175,13 +183,14 @@ export const App: React.FC = () => {
     incidentId: string,
     decision: 'approved' | 'rejected' | 'escalate' | 'snooze',
     notes: string,
-    snoozeMs?: number
+    snoozeMs?: number,
+    pin?: string
   ) => {
     try {
       await fetch(`/api/incidents/${incidentId}/voice-decision`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, notes, snoozeMs }),
+        body: JSON.stringify({ decision, notes, snoozeMs, pin }),
       });
     } catch (err) {
       console.error('Failed to submit voice decision:', err);
@@ -364,6 +373,7 @@ export const App: React.FC = () => {
 
       <LiveVoiceDrawer
         incident={activeVoiceIncident}
+        config={config}
         onClose={() => setActiveVoiceIncident(null)}
         onSubmitVoiceDecision={handleSubmitVoiceDecision}
         onAskQuestion={handleAskVoiceQuestion}

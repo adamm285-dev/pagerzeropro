@@ -295,7 +295,9 @@ describe('PagerZero Core Logic', () => {
       await incidentManager.submitVoiceDecision(
         incident.id,
         'approved',
-        'Yeah, I approve. Recycle the pool.'
+        'Approve 1234. Recycle the pool.',
+        undefined,
+        '1234'
       );
 
       for (let i = 0; i < 30 && updated?.status !== 'RESOLVED'; i++) {
@@ -307,8 +309,56 @@ describe('PagerZero Core Logic', () => {
       expect(updated?.riskTier).toBe('TIER_2_VOICE_APPROVAL');
       expect(updated?.voiceCall?.status).toBe('completed');
       expect(updated?.voiceCall?.result?.approvalStatus).toBe('approved');
+      expect(updated?.voiceCall?.result?.pinVerified).toBe(true);
       expect(updated?.remediation?.success).toBe(true);
       expect(updated?.postMortem).toContain('Voice Approval Call');
+      expect(updated?.postMortem).toContain('Security PIN');
+    }, 15000);
+
+    it('rejects voice approval and escalates when PIN is incorrect', async () => {
+      incidentManager.config.callMode = 'voice_simulator';
+      incidentManager.config.securityPin = '1234';
+      incidentManager.config.requirePin = true;
+
+      const alert: AlertPayload = {
+        id: 'pin-fail-test-1',
+        source: 'chaos_simulator',
+        service: 'payments-api',
+        severity: 'P1',
+        title: 'DB Pool Saturated',
+        description: 'Hung connections',
+        metric: 'db_connection_pool_active',
+        currentValue: 198,
+        thresholdValue: 170,
+        timestamp: new Date().toISOString(),
+      };
+
+      const incident = await incidentManager.handleAlert(alert);
+
+      let updated = incidentManager.getById(incident.id);
+      for (let i = 0; i < 25 && updated?.status !== 'AWAITING_VOICE_APPROVAL'; i++) {
+        await new Promise((r) => setTimeout(r, 200));
+        updated = incidentManager.getById(incident.id);
+      }
+      expect(updated?.status).toBe('AWAITING_VOICE_APPROVAL');
+
+      // Submit with invalid PIN
+      await incidentManager.submitVoiceDecision(
+        incident.id,
+        'approved',
+        'Yeah, I approve. Recycle the pool.',
+        undefined,
+        '9999'
+      );
+
+      for (let i = 0; i < 20 && updated?.status !== 'ESCALATED'; i++) {
+        await new Promise((r) => setTimeout(r, 200));
+        updated = incidentManager.getById(incident.id);
+      }
+
+      expect(updated?.status).toBe('ESCALATED');
+      expect(updated?.voiceCall?.result?.pinVerified).toBe(false);
+      expect(updated?.remediation).toBeUndefined();
     }, 15000);
   });
 });

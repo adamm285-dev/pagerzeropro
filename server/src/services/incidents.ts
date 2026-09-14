@@ -16,6 +16,7 @@ import { discordNotifier } from './discord.js';
 import { DEFAULT_SERVICE_GATES, resolveAutonomyPath } from './policy.js';
 import { answerEngineerQuestion } from './briefing.js';
 import { formatSnooze, parseSnoozeMs } from './snooze.js';
+import { extractSpokenPin } from './pin.js';
 
 type IncidentListener = (event: { type: string; incident: Incident; data?: any }) => void;
 
@@ -23,6 +24,8 @@ type VoiceDecision = {
   approvalStatus: 'approved' | 'rejected' | 'escalate' | 'snooze';
   spokenInstructions: string;
   snoozeMs?: number;
+  pinVerified?: boolean;
+  spokenPin?: string;
 };
 
 class IncidentManager {
@@ -43,6 +46,8 @@ class IncidentManager {
     escalationTimeoutSeconds: 45,
     shadowMode: process.env.SHADOW_MODE === 'true',
     serviceGates: { ...DEFAULT_SERVICE_GATES },
+    securityPin: process.env.SECURITY_PIN || '1234',
+    requirePin: true,
   };
 
   constructor() {}
@@ -126,6 +131,7 @@ class IncidentManager {
     if (serviceGates) {
       this.config.serviceGates = { ...this.config.serviceGates, ...serviceGates };
     }
+    this.broadcast('config_updated' as any, { config: this.config } as any);
     return this.config;
   }
 
@@ -254,6 +260,8 @@ class IncidentManager {
             voiceScript: diagnosis.voicePromptScript,
             actionName: diagnosis.recommendedAction.name,
             liveMode: true,
+            securityPin: this.config.securityPin,
+            requirePin: this.config.requirePin,
           },
           (turn: VoiceCallTurn) => this.appendCallTurn(incident, turn)
         );
@@ -269,10 +277,12 @@ class IncidentManager {
               status: 'completed',
               approvalStatus: outcome.approvalStatus,
               spokenInstructions: outcome.spokenInstructions,
+              pinVerified: outcome.pinVerified,
+              spokenPin: outcome.spokenPin,
               confidence: 0.99,
               durationSeconds: 15,
               transcript: incident.voiceCall?.result?.transcript || [],
-              summary: `Dashboard decision: ${outcome.approvalStatus}`,
+              summary: `Dashboard decision: ${outcome.approvalStatus}${outcome.pinVerified !== undefined ? ` (PIN ${outcome.pinVerified ? 'verified' : 'failed'})` : ''}`,
             });
           }
         } else {
@@ -282,25 +292,39 @@ class IncidentManager {
             winner.call.approvalStatus === 'snooze'
               ? parseSnoozeMs(winner.call.spokenInstructions || 'snooze') || 5 * 60 * 1000
               : undefined;
+
+          let approval = winner.call.approvalStatus;
+          let instructions = winner.call.spokenInstructions || winner.call.approvalStatus;
+          if (approval === 'approved' && this.config.requirePin && winner.call.pinVerified === false) {
+            approval = 'escalate';
+            instructions = `Voice approval rejected: Security PIN verification failed (expected ${this.config.securityPin}).`;
+          }
+
           outcome = {
             approvalStatus:
-              winner.call.approvalStatus === 'approved' ||
-              winner.call.approvalStatus === 'rejected' ||
-              winner.call.approvalStatus === 'escalate' ||
-              winner.call.approvalStatus === 'snooze'
-                ? winner.call.approvalStatus
+              approval === 'approved' ||
+              approval === 'rejected' ||
+              approval === 'escalate' ||
+              approval === 'snooze'
+                ? approval
                 : 'escalate',
-            spokenInstructions: winner.call.spokenInstructions || winner.call.approvalStatus,
+            spokenInstructions: instructions,
             snoozeMs,
+            pinVerified: winner.call.pinVerified,
+            spokenPin: winner.call.spokenPin,
           };
         }
       } else {
+        const promptScript = this.config.requirePin
+          ? `${diagnosis.voicePromptScript} Please say Approved and state your 4-digit PIN ${this.config.securityPin}.`
+          : diagnosis.voicePromptScript;
+
         this.appendCallTurn(incident, {
           speaker: 'agent',
           text:
             attempt === 0
-              ? diagnosis.voicePromptScript
-              : `It's PagerZero again. ${diagnosis.voicePromptScript}`,
+              ? promptScript
+              : `It's PagerZero again. ${promptScript}`,
           timestamp: new Date().toISOString(),
         });
         incident.voiceCall!.status = 'in_progress';
@@ -312,6 +336,8 @@ class IncidentManager {
             status: 'completed',
             approvalStatus: outcome.approvalStatus,
             spokenInstructions: outcome.spokenInstructions,
+            pinVerified: outcome.pinVerified,
+            spokenPin: outcome.spokenPin,
             confidence: 0.99,
             durationSeconds: 15,
             transcript: incident.voiceCall?.result?.transcript || [],
@@ -334,10 +360,11 @@ class IncidentManager {
       }
 
       if (outcome.approvalStatus === 'approved') {
+        const pinTag = this.config.requirePin ? ` [PIN ${outcome.spokenPin || this.config.securityPin} Verified]` : '';
         this.updateStatus(
           incident,
           'EXECUTING_REMEDIATION',
-          `Voice Approval Received from ${this.config.engineerName}: "${outcome.spokenInstructions}". Executing approved action.`
+          `Voice Approval Received from ${this.config.engineerName}: "${outcome.spokenInstructions}"${pinTag}. Executing approved action.`
         );
         await this.executeRemediation(incident);
         return;
@@ -522,7 +549,8 @@ class IncidentManager {
     incidentId: string,
     approvalStatus: 'approved' | 'rejected' | 'escalate' | 'snooze',
     spokenInstructions: string,
-    snoozeMs?: number
+    snoozeMs?: number,
+    pin?: string
   ) {
     const incident = this.incidents.get(incidentId);
     if (!incident || incident.status !== 'AWAITING_VOICE_APPROVAL') {
@@ -534,6 +562,28 @@ class IncidentManager {
         ? snoozeMs || parseSnoozeMs(spokenInstructions) || 5 * 60 * 1000
         : undefined;
 
+    let pinVerified = true;
+    let spokenPin = pin;
+
+    if (approvalStatus === 'approved' && this.config.requirePin) {
+      const expected = (this.config.securityPin || '1234').trim();
+      const extractedFromSpoken = extractSpokenPin(spokenInstructions);
+      const providedPin = (pin || '').trim();
+
+      const pinMatches =
+        (providedPin.length > 0 && providedPin === expected) ||
+        (extractedFromSpoken !== null && extractedFromSpoken === expected);
+
+      if (!pinMatches) {
+        pinVerified = false;
+        approvalStatus = 'escalate';
+        spokenInstructions = `${spokenInstructions} [SECURITY REJECTED: Missing or invalid PIN. Expected ${expected}${extractedFromSpoken ? `, spoken: ${extractedFromSpoken}` : ', no PIN spoken'}]`;
+      } else {
+        pinVerified = true;
+        spokenPin = expected;
+      }
+    }
+
     this.appendCallTurn(incident, {
       speaker: 'engineer',
       text: spokenInstructions,
@@ -543,16 +593,26 @@ class IncidentManager {
       speaker: 'agent',
       text:
         approvalStatus === 'approved'
-          ? `Got it. Executing ${incident.diagnosis?.recommendedAction.name || 'the fix'} now. I'll confirm when telemetry is back in band.`
+          ? (this.config.requirePin
+              ? `Security PIN ${spokenPin || this.config.securityPin} verified. Executing ${incident.diagnosis?.recommendedAction.name || 'the fix'} now. I'll confirm when telemetry is back in band.`
+              : `Got it. Executing ${incident.diagnosis?.recommendedAction.name || 'the fix'} now. I'll confirm when telemetry is back in band.`)
           : approvalStatus === 'snooze'
             ? `Understood. I'll call you back in ${formatSnooze(resolvedSnooze!)}. Not escalating.`
-            : `Heard you. Not executing. Escalating so a human can take it.`,
+            : pinVerified === false
+              ? `Security PIN verification failed. Fix rejected. Escalating to human on-call.`
+              : `Heard you. Not executing. Escalating so a human can take it.`,
       timestamp: new Date().toISOString(),
     });
 
     const waiter = this.voiceWaiters.get(incidentId);
     if (waiter) {
-      waiter.resolve({ approvalStatus, spokenInstructions, snoozeMs: resolvedSnooze });
+      waiter.resolve({
+        approvalStatus,
+        spokenInstructions,
+        snoozeMs: resolvedSnooze,
+        pinVerified,
+        spokenPin,
+      });
       return;
     }
 
@@ -660,6 +720,7 @@ ${incident.riskTier === 'TIER_1_AUTO'
   ? `- **Autonomous Resolution:** Marked as safe and idempotent. Remediated without waking the engineer.`
   : `- **Voice Approval Call:** A CALL-E phone call was placed to ${this.config.phoneNumber}.
   - **Spoken Input:** "${v?.spokenInstructions || 'Approved'}"
+  - **Security PIN Authorization:** ${this.config.requirePin ? `Verified (${v?.spokenPin || this.config.securityPin})` : 'Not required'}
   - **Outcome:** ${v?.approvalStatus} (Confidence: ${((v?.confidence || 1) * 100).toFixed(0)}%)`}
 
 ---

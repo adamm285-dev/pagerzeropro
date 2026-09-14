@@ -72,6 +72,8 @@ export interface CallEResult {
   status: 'completed' | 'failed' | 'in_progress' | 'cancelled';
   approvalStatus: 'approved' | 'rejected' | 'escalate' | 'snooze' | 'unreachable';
   spokenInstructions?: string;
+  pinVerified?: boolean;
+  spokenPin?: string;
   confidence: number;
   durationSeconds: number;
   transcript: VoiceCallTurn[];
@@ -145,4 +147,6 @@ export interface OnCallConfig {
   escalationTimeoutSeconds: number;
   shadowMode: boolean;
   serviceGates: Record<string, 'auto' | 'voice' | 'escalate'>;
+  securityPin: string;
+  requirePin: boolean;
 }

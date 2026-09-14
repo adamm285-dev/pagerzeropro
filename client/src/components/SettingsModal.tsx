@@ -31,6 +31,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [escalationTimeoutSeconds, setEscalationTimeoutSeconds] = useState(
     config.escalationTimeoutSeconds
   );
+  const [securityPin, setSecurityPin] = useState(config.securityPin || '1234');
+  const [requirePin, setRequirePin] = useState(config.requirePin ?? true);
   const [saving, setSaving] = useState(false);
   const [shadowMode, setShadowMode] = useState(config.shadowMode);
   const [serviceGates, setServiceGates] = useState(config.serviceGates || {});
@@ -44,6 +46,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setQuietHoursStart(config.quietHours.start);
     setQuietHoursEnd(config.quietHours.end);
     setEscalationTimeoutSeconds(config.escalationTimeoutSeconds);
+    setSecurityPin(config.securityPin || '1234');
+    setRequirePin(config.requirePin ?? true);
     setShadowMode(Boolean(config.shadowMode));
     setServiceGates({ ...(config.serviceGates || {}) });
   }, [config, isOpen]);
@@ -67,6 +71,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         escalationTimeoutSeconds,
         shadowMode,
         serviceGates,
+        securityPin,
+        requirePin,
       });
 
       if (calleApiKey.trim()) {
@@ -258,6 +264,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onChange={(e) => setEscalationTimeoutSeconds(Number(e.target.value))}
               className={inputClass}
             />
+          </div>
+
+          <div className="pt-2 border-t border-crt-line">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-phosphor mb-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-term" />
+              <span>VOICE APPROVAL SECURITY PIN</span>
+            </div>
+            <p className="text-[11px] text-phosphor-dim mb-2">
+              Engineers must speak their approval AND this 4-digit PIN (e.g. &quot;Approve {securityPin}&quot;) over the phone to authorize production remediations.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-phosphor-dim">4-DIGIT PIN</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={securityPin}
+                  onChange={(e) => setSecurityPin(e.target.value)}
+                  className={inputClass}
+                  placeholder="1234"
+                />
+              </div>
+              <div className="flex items-center mt-3">
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={requirePin}
+                    onChange={(e) => setRequirePin(e.target.checked)}
+                    className="bg-crt-bg border-crt-line text-phosphor"
+                  />
+                  <span>Require PIN for Approval</span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <div className="pt-2 border-t border-crt-line">

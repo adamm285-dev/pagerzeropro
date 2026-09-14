@@ -94,7 +94,7 @@ incidentsRouter.post('/:id/voice-question', (req: Request, res: Response) => {
 });
 
 incidentsRouter.post('/:id/voice-decision', async (req: Request, res: Response) => {
-  const { decision, notes } = req.body;
+  const { decision, notes, pin } = req.body;
   if (!decision || !['approved', 'rejected', 'escalate', 'snooze'].includes(decision)) {
     res.status(400).json({ error: 'Invalid decision. Must be approved, rejected, escalate, or snooze' });
     return;
@@ -106,7 +106,8 @@ incidentsRouter.post('/:id/voice-decision', async (req: Request, res: Response) 
       req.params.id,
       decision,
       notes || (decision === 'approved' ? 'Approved via voice simulator' : 'Rejected by engineer'),
-      snoozeMs
+      snoozeMs,
+      pin
     );
     res.json({ status: 'ok', decision });
   } catch (err: any) {

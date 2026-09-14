@@ -1,6 +1,8 @@
+.gcloudignore
+.git
+.gitignore
 node_modules
 client/node_modules
-.git
 .worktrees
 dist
 client/dist
