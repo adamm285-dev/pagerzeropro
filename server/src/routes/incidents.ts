@@ -61,6 +61,16 @@ incidentsRouter.post('/config/discord-webhook', (req: Request, res: Response) =>
   res.json({ success: true, hasDiscordWebhook: discordNotifier.hasWebhook() });
 });
 
+incidentsRouter.post('/config/discord-webhook/test', async (req: Request, res: Response) => {
+  const url = typeof req.body?.url === 'string' ? req.body.url : undefined;
+  const result = await discordNotifier.sendTestPing(url);
+  if (!result.success) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ success: true, message: result.message });
+});
+
 incidentsRouter.get('/:id', (req: Request, res: Response) => {
   const inc = incidentManager.getById(req.params.id);
   if (!inc) {

@@ -75,6 +75,23 @@ export const App: React.FC = () => {
 
     connect();
 
+    // Auto-sync stored webhook from localStorage to server if present
+    const storedWebhook = typeof window !== 'undefined' ? localStorage.getItem('pagerzero_discord_webhook') : null;
+    if (storedWebhook) {
+      fetch('/api/incidents/config/discord-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: storedWebhook }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.hasDiscordWebhook) {
+            setConfig((prev) => ({ ...prev, hasDiscordWebhook: true }));
+          }
+        })
+        .catch(() => {});
+    }
+
     return () => {
       disposed = true;
       if (retry) clearTimeout(retry);
@@ -228,6 +245,11 @@ export const App: React.FC = () => {
 
   const handleSaveDiscordWebhook = async (url: string) => {
     try {
+      if (url.trim()) {
+        localStorage.setItem('pagerzero_discord_webhook', url.trim());
+      } else {
+        localStorage.removeItem('pagerzero_discord_webhook');
+      }
       const res = await fetch('/api/incidents/config/discord-webhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

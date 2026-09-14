@@ -222,6 +222,13 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
     }
   };
 
+  const isRinging = transcript.some((t) => t.text.toLowerCase().includes('ringing'));
+  const isConnected = transcript.some((t) => t.text.toLowerCase().includes('connected'));
+  const latestCallEStatus = [...transcript]
+    .reverse()
+    .find((t) => t.text.startsWith('[CALL-E]') || t.text.includes('RINGING') || t.text.includes('Connected'))
+    ?.text;
+
   const snoozing = Boolean(incident.snoozeUntil && Date.parse(incident.snoozeUntil) > Date.now());
   const statusLine = isResolved
     ? 'Closed. Signing off.'
@@ -230,7 +237,11 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
       : snoozing
         ? `Snoozed until ${new Date(incident.snoozeUntil!).toLocaleTimeString()}. Will redial.`
         : isLiveCallMode
-          ? `Outbound call placed via CALL-E to ${targetPhone}...`
+          ? isConnected
+            ? `Active call connected to ${targetPhone}`
+            : isRinging
+              ? `Phone line ringing at ${targetPhone}...`
+              : latestCallEStatus || `Dispatching outbound call via CALL-E to ${targetPhone}...`
           : isSpeakingAgent
             ? 'Agent speaking…'
             : 'Ask a question, say Approved, or Snooze.';
@@ -258,16 +269,37 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
         {/* Live Call Instructions for Google Voice / Mobile */}
         {isLiveCallMode && isAwaitingApproval && (
           <div className="mt-3 border border-phosphor/50 bg-phosphor/10 p-2.5 text-center text-xs text-phosphor">
-            <div className="font-bold text-phosphor-bright flex items-center justify-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-phosphor-bright animate-ping" />
-              <span>Ringing Google Voice / Phone: {targetPhone}</span>
-            </div>
-            <div className="mt-1 text-[11px] text-phosphor-dim">
-              Answer the call on your phone or Google Voice tab and say:{' '}
-              <span className="font-bold text-phosphor-bright">
-                &quot;Approve {securityPin}&quot;
-              </span>
-            </div>
+            {isConnected ? (
+              <>
+                <div className="font-bold text-phosphor-bright flex items-center justify-center gap-2">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-phosphor-bright animate-pulse" />
+                  <span>CALL CONNECTED: {targetPhone}</span>
+                </div>
+                <div className="mt-1 text-[11px] text-phosphor-dim">
+                  Audio channel active. Speak clearly into your phone: <span className="font-bold text-phosphor-bright">&quot;Approve {securityPin}&quot;</span>
+                </div>
+              </>
+            ) : isRinging ? (
+              <>
+                <div className="font-bold text-phosphor-bright flex items-center justify-center gap-2">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-phosphor-bright animate-ping" />
+                  <span>🔔 RINGING GOOGLE VOICE / PHONE: {targetPhone}</span>
+                </div>
+                <div className="mt-1 text-[11px] text-phosphor-dim">
+                  Pick up the incoming call and say: <span className="font-bold text-phosphor-bright">&quot;Approve {securityPin}&quot;</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="font-bold text-amber-term flex items-center justify-center gap-2">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-term animate-spin" />
+                  <span>DIALING OUTBOUND VIA CALL-E TRUNK</span>
+                </div>
+                <div className="mt-1 text-[11px] text-amber-term-dim">
+                  Telephony carrier pipeline routing to {targetPhone} (~45s SIP setup latency). Phone will ring shortly.
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -294,7 +326,7 @@ export const LiveVoiceDrawer: React.FC<LiveVoiceDrawerProps> = ({
                 .map((t) => `${t.speaker === 'agent' ? 'agent>' : 'you>'} ${t.text}`)
                 .join('\n')
             : isLiveCallMode
-              ? `agent> [CALL-E] Calling ${targetPhone}... Line is ringing. Answer call and state your approval with PIN ${securityPin}.`
+              ? `agent> [CALL-E] Task dispatched to CALL-E telephony for ${targetPhone}. Provisioning BotLab AI agent and SIP carrier trunk...`
               : `agent> ${script}`}
           {speechRecognized ? `\nyou> ${speechRecognized}` : ''}
         </pre>

@@ -24,7 +24,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [callMode, setCallMode] = useState(config.callMode);
   const [autoApproveTier1, setAutoApproveTier1] = useState(config.autoApproveTier1);
   const [calleApiKey, setCalleApiKey] = useState('');
-  const [discordWebhook, setDiscordWebhook] = useState('');
+  const [discordWebhook, setDiscordWebhook] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('pagerzero_discord_webhook')) || '';
+  });
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [webhookTestStatus, setWebhookTestStatus] = useState<string | null>(null);
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(config.quietHours.enabled);
   const [quietHoursStart, setQuietHoursStart] = useState(config.quietHours.start);
   const [quietHoursEnd, setQuietHoursEnd] = useState(config.quietHours.end);
@@ -36,6 +40,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [shadowMode, setShadowMode] = useState(config.shadowMode);
   const [serviceGates, setServiceGates] = useState(config.serviceGates || {});
+
+  const handleTestWebhook = async () => {
+    const url = discordWebhook.trim();
+    setTestingWebhook(true);
+    setWebhookTestStatus(null);
+    try {
+      const res = await fetch('/api/incidents/config/discord-webhook/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: url || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send test message');
+      setWebhookTestStatus('SUCCESS: Check your Discord channel!');
+    } catch (err: any) {
+      setWebhookTestStatus(`ERROR: ${err.message}`);
+    } finally {
+      setTestingWebhook(false);
+    }
+  };
 
   useEffect(() => {
     setEngineerName(config.engineerName);
@@ -135,12 +159,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           <div>
-            <label className="text-xs font-bold text-phosphor mb-1 block">
-              DISCORD INCIDENT WEBHOOK
-              <span className="text-[10px] font-normal text-phosphor-dim ml-1">
-                (Optional ChatOps mirror)
-              </span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-phosphor block">
+                DISCORD INCIDENT WEBHOOK
+                <span className="text-[10px] font-normal text-phosphor-dim ml-1">
+                  (ChatOps mirror)
+                </span>
+              </label>
+              {(discordWebhook.trim() || config.hasDiscordWebhook) && (
+                <button
+                  type="button"
+                  onClick={handleTestWebhook}
+                  disabled={testingWebhook}
+                  className="text-[10px] px-2 py-0.5 border border-phosphor/60 hover:border-phosphor text-phosphor hover:bg-phosphor/10 transition-colors"
+                >
+                  {testingWebhook ? 'SENDING PING...' : 'SEND TEST PING'}
+                </button>
+              )}
+            </div>
             <input
               type="password"
               placeholder={
@@ -149,9 +185,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   : 'https://discord.com/api/webhooks/…'
               }
               value={discordWebhook}
-              onChange={(e) => setDiscordWebhook(e.target.value)}
+              onChange={(e) => {
+                setDiscordWebhook(e.target.value);
+                setWebhookTestStatus(null);
+              }}
               className={inputClass}
             />
+            {webhookTestStatus && (
+              <div
+                className={`mt-1 text-[11px] font-bold ${
+                  webhookTestStatus.startsWith('SUCCESS')
+                    ? 'text-phosphor-bright'
+                    : 'text-red-400'
+                }`}
+              >
+                {webhookTestStatus}
+              </div>
+            )}
             <p className="text-[11px] text-phosphor-dim mt-1">
               Channel → Integrations → Webhooks. Posts diagnosis, call status, and verified recovery.
             </p>

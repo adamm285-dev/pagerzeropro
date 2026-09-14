@@ -174,22 +174,43 @@ Record their exact spoken words in spoken_notes.`;
       console.log(`[CALL-E] Call created with ID: ${initialCall.id}. Awaiting telephony response...`);
       onProgress?.({
         speaker: 'agent',
-        text: `[CALL-E] Ringing ${phoneNumber} (Call ID: ${initialCall.id}). Answer on Google Voice or mobile...`,
+        text: `[CALL-E] Task queued (${initialCall.id}). Provisioning BotLab AI agent...`,
         timestamp: new Date().toISOString(),
       });
 
-      // Poll for call completion and stream transcript turns
-      const intervalMs = 2500;
+      // Poll for call completion and stream both developer events and transcript turns
+      const intervalMs = 2000;
       const timeoutMs = 120000;
       const deadline = Date.now() + timeoutMs;
       let lastTurnCount = 0;
+      const seenEventIds = new Set<string>();
       let finalCall = initialCall;
 
       while (Date.now() <= deadline) {
         await new Promise((r) => setTimeout(r, intervalMs));
         try {
-          const polled = await this.client.calls.get(initialCall.id);
+          const [polled, eventsList] = await Promise.all([
+            this.client.calls.get(initialCall.id),
+            this.client.calls.listEvents(initialCall.id).catch(() => null),
+          ]);
           finalCall = polled;
+
+          // Stream developer events (telephony pipeline progress)
+          if (eventsList?.data) {
+            for (const evt of eventsList.data) {
+              if (!seenEventIds.has(evt.id)) {
+                seenEventIds.add(evt.id);
+                const formatted = formatEventMessage(evt.message, phoneNumber);
+                if (formatted) {
+                  onProgress?.({
+                    speaker: 'agent',
+                    text: formatted,
+                    timestamp: evt.created_at || new Date().toISOString(),
+                  });
+                }
+              }
+            }
+          }
 
           // Check for transcript turns
           const turns = polled.recipients?.[0]?.attempts?.[0]?.transcriptTurns || [];
@@ -400,3 +421,15 @@ Record their exact spoken words in spoken_notes.`;
 }
 
 export const calleService = new CalleService();
+
+function formatEventMessage(rawMessage: string, phone: string): string | null {
+  const msg = rawMessage.trim();
+  if (msg.startsWith('run_call started')) return `[CALL-E] Outbound dialing pipeline initiated.`;
+  if (msg.startsWith('botlab create bot')) return `[CALL-E] Provisioning BotLab AI agent...`;
+  if (msg.startsWith('calling resolve robot id')) return `[CALL-E] Persona linked. Connecting carrier SIP trunk...`;
+  if (msg.startsWith('calling create task')) return `[CALL-E] Task dispatched to carrier queue...`;
+  if (msg.includes('status=calling')) return `[CALL-E] Carrier dialing cellular network (${phone})...`;
+  if (msg.includes('Call is ringing')) return `🔔 [CALL-E] Phone line is RINGING ${phone}! Pick up Google Voice.`;
+  if (msg.includes('Call connected')) return `📞 [CALL-E] Connected to ${phone}! Real-time audio active.`;
+  return null;
+}

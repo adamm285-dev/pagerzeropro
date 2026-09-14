@@ -28,6 +28,10 @@ class DiscordNotifier {
     return isDiscordWebhookUrl(this.webhookUrl);
   }
 
+  public getWebhookUrl(): string {
+    return this.webhookUrl;
+  }
+
   public setWebhookUrl(url: string): boolean {
     const next = url.trim();
     if (!next) {
@@ -37,6 +41,43 @@ class DiscordNotifier {
     if (!isDiscordWebhookUrl(next)) return false;
     this.webhookUrl = next;
     return true;
+  }
+
+  public async sendTestPing(overrideUrl?: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    const target = (overrideUrl || this.webhookUrl).trim();
+    if (!isDiscordWebhookUrl(target)) {
+      return { success: false, error: 'Invalid or missing Discord webhook URL' };
+    }
+    try {
+      const res = await fetch(target, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: 'PagerZero SRE',
+          embeds: [
+            {
+              title: '✅ PagerZero Discord Webhook Connected',
+              url: 'https://pagerzero.pro',
+              color: 0x10b981,
+              description: 'Incident notifications, CALL-E approvals, and verified recovery post-mortems are now mirroring to this channel.',
+              fields: [
+                { name: 'Environment', value: 'Production (pagerzero.pro)', inline: true },
+                { name: 'Status', value: 'Operational', inline: true },
+              ],
+              footer: { text: 'PagerZero Autonomous SRE • pagerzero.pro' },
+              timestamp: new Date().toISOString(),
+            },
+          ],
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        return { success: false, error: `Discord rejected webhook (HTTP ${res.status}): ${body.slice(0, 200)}` };
+      }
+      return { success: true, message: 'Test notification sent to Discord!' };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to send test ping' };
+    }
   }
 
   public notifyIncident(incident: Incident, message: string): void {
