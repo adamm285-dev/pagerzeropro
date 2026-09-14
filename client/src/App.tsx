@@ -14,7 +14,7 @@ export const App: React.FC = () => {
   const [services, setServices] = useState<ServiceHealth[]>([]);
   const [config, setConfig] = useState<OnCallConfig>({
     engineerName: 'Adam (Primary SRE)',
-    phoneNumber: '+15551234567',
+    phoneNumber: '+15555550100',
     callMode: 'voice_simulator',
     autoApproveTier1: true,
     quietHours: { enabled: true, start: '22:00', end: '07:00' },

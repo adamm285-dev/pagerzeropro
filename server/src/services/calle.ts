@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { CalleClient } from '@call-e/calle';
 import { CallEResult, VoiceCallTurn } from '../types.js';
 

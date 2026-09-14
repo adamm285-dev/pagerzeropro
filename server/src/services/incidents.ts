@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   Incident, 
@@ -31,7 +32,7 @@ class IncidentManager {
   
   public config: OnCallConfig = {
     engineerName: process.env.ON_CALL_NAME || 'Adam (Primary SRE)',
-    phoneNumber: process.env.ON_CALL_PHONE || '+15551234567',
+    phoneNumber: process.env.ON_CALL_PHONE || '+15555550100',
     callMode: (process.env.CALLE_API_KEY ? 'calle_live' : 'voice_simulator') as any,
     autoApproveTier1: true,
     quietHours: {

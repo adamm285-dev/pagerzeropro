@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -7,6 +8,7 @@ import { alertsRouter } from './routes/alerts.js';
 import { incidentsRouter } from './routes/incidents.js';
 import { incidentManager } from './services/incidents.js';
 import { clusterSimulator } from './services/cluster.js';
+import { calleService } from './services/calle.js';
 
 dotenv.config();
 
@@ -57,7 +59,7 @@ wss.on('connection', (ws) => {
     services: clusterSimulator.getAllServices(),
     config: {
       ...incidentManager.config,
-      hasCalleApiKey: Boolean(process.env.CALLE_API_KEY),
+      hasCalleApiKey: calleService.hasValidApiKey(),
     }
   }));
 
